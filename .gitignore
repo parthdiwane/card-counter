@@ -1,4 +1,42 @@
+# Environment
 .env
-logs
-model/data
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Model weights (large files)
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Training outputs
+runs/
+wandb/
+
+# Dataset (large files)
+model/data/
 model/*.zip
+*.cache
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
