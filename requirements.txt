@@ -1,0 +1,29 @@
+# Model training dependencies
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+torch>=2.0.0
+numpy>=1.24.0
+
+# Agent-S dependencies
+backoff
+pandas
+openai
+anthropic
+fastapi
+uvicorn
+paddleocr
+paddlepaddle
+together
+scikit-learn
+websockets
+tiktoken
+pyautogui
+toml
+black
+pytesseract
+google-genai
+
+# Platform-specific dependencies
+pyobjc; platform_system == "Darwin"
+pywinauto; platform_system == "Windows"
+pywin32; platform_system == "Windows"
