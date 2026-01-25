@@ -60,11 +60,8 @@ def main():
         fliplr=0.5,
         mosaic=1.0,
         mixup=0.1,
-        # NMS settings to prevent timeout
-        nms=True,
-        max_det=100,  # Max detections per image (cards on table rarely exceed this)
-        conf=0.25,    # Higher confidence threshold during training
-        iou=0.5,      # IOU threshold for NMS
+        # Validation settings
+        max_det=100,  # Max detections per image
     )
 
     print("\nTraining complete!")
