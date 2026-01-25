@@ -109,35 +109,35 @@ inline std::map<int,int> remaining_deck_counts(const std::vector<int> &played, i
 }
 
 
-inline std::map<int, double> dealer_probs(int dealer_hand, std::map<int, int> remaining){
-    if(dealer_hand > 21){
-        return {{22, 1.0}};
-    }
-    if(dealer_hand >= 17){
-        return {{dealer_hand, 1.0}};
-    }
-    //new sub_map 
-    std::map<int,double> sub_map; 
-    std::map<int, double> probs; 
-    int total_cards_left = 0;
-    for (const auto &p : remaining){
-        total_cards_left += p.second;
-    }
-    for(const auto &p : remaining){
-        int card = p.first;
-        int count = p.second;
-        int new_hand = dealer_hand + card; 
-        double p_draw = count / total_cards_left;
-        remaining[card]--;
-        sub_map = dealer_probs(new_hand, remaining);
-        remaining[card]++;
-        //combine with the chance of new hand 
-        for(const auto &p : sub_map){
-            probs[p.first] = p.second * p_draw;
-        }
-    }
+// inline std::map<int, double> dealer_probs(int dealer_hand, std::map<int, int> remaining){
+//     if(dealer_hand > 21){
+//         return {{22, 1.0}};
+//     }
+//     if(dealer_hand >= 17){
+//         return {{dealer_hand, 1.0}};
+//     }
+//     //new sub_map 
+//     std::map<int,double> sub_map; 
+//     std::map<int, double> probs; 
+//     int total_cards_left = 0;
+//     for (const auto &p : remaining){
+//         total_cards_left += p.second;
+//     }
+//     for(const auto &p : remaining){
+//         int card = p.first;
+//         int count = p.second;
+//         int new_hand = dealer_hand + card; 
+//         double p_draw = count / total_cards_left;
+//         remaining[card]--;
+//         sub_map = dealer_probs(new_hand, remaining);
+//         remaining[card]++;
+//         //combine with the chance of new hand 
+//         for(const auto &p : sub_map){
+//             probs[p.first] = p.second * p_draw;
+//         }
+//     }
    
-}
+// }
 
 
 
@@ -147,7 +147,6 @@ struct HandStats{
     std::map<int,int> counts;
 
 };
-
 
 
 
@@ -195,5 +194,39 @@ inline HandStats compute_hand_stats(const std::vector<int> &played, bool for_pla
     }
     return s;
 }
+inline std::map<int, double> dealerRecurse(int hand, std::map<int,int>& deck, int deck_size){
+    // base cases
+    // bust
+    if(hand > 21){
+        return {{22, 1.0}};
+    }
+    // must stand (dealer stands on 17+)
+    if(hand >= 17){
+        return {{hand, 1.0}};
+    }
+
+    std::map<int,double> totalProbs = {{17, 0.0},{18, 0.0},{19, 0.0},{20, 0.0},{21, 0.0},{22, 0.0}};
+
+    for(const auto &p : deck){
+        if (p.second == 0){
+            continue;
+        }
+        double draw_prob = static_cast<double>(p.second) / deck_size;
+
+        // Temporarily remove card from deck for recursion
+        deck[p.first]--;
+        std::map<int,double> branchProb = dealerRecurse(hand + p.first, deck, deck_size - 1);
+        deck[p.first]++;  // restore card
+
+        for(const auto &outcome : branchProb){
+            totalProbs[outcome.first] += draw_prob * outcome.second;
+        }
+    }
+
+    return totalProbs;
+}
+
+
+
 
 #endif // CARD_COUNTER_CARD_HELPERS_H
