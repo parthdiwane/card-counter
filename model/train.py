@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--model', type=str, default='yolov8n.pt',
                         help='Base model: yolov8n.pt (fast), yolov8s.pt (balanced), yolov8m.pt (accurate)')
     parser.add_argument('--epochs', type=int, default=25, help='Number of training epochs')
-    parser.add_argument('--batch', type=int, default=16, help='Batch size')
+    parser.add_argument('--batch', type=int, default=8, help='Batch size')
     parser.add_argument('--imgsz', type=int, default=640, help='Image size')
     parser.add_argument('--device', type=str, default='', help='Device: cpu, 0, 0,1, mps')
     parser.add_argument('--resume', action='store_true', help='Resume training from last checkpoint')
@@ -61,7 +61,8 @@ def main():
         mosaic=1.0,
         mixup=0.1,
         # Validation settings
-        max_det=100,  # Max detections per image
+        max_det=50,  # Max detections per image
+        conf=0.1,  # Filter low-confidence predictions to speed up NMS
     )
 
     print("\nTraining complete!")
