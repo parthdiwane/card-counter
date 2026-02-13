@@ -1,12 +1,12 @@
 """
-Live card detection using webcam.
+Card detection using webcam or video file.
 Displays bounding boxes with card labels in real-time.
 """
 
 import cv2
 from ultralytics import YOLO
 import argparse
-import numpy as np
+from pathlib import Path
 
 # Card name mappings for better display
 CARD_NAMES = {
@@ -40,6 +40,25 @@ def get_color_for_card(card_code):
     return SUIT_COLORS.get(suit, (255, 255, 255))
 
 
+def format_card(card_code):
+    """Format card code to uppercase (e.g., '4s' -> '4S', 'Ah' -> 'AH')."""
+    return card_code.upper()
+
+
+def get_latest_recording():
+    """Get the most recent recording from the recordings folder."""
+    recordings_dir = Path(__file__).parent / "recordings"
+    if not recordings_dir.exists():
+        return None
+
+    recordings = sorted(recordings_dir.glob("*.mp4"))
+    if not recordings:
+        return None
+
+    # Filenames are YYYYMMDD_HHMMSS.mp4, so sorting alphabetically gives chronological order
+    return str(recordings[-1])
+
+
 def draw_detection(frame, box, label, confidence, color):
     """Draw bounding box and label on frame."""
     x1, y1, x2, y2 = map(int, box)
@@ -55,7 +74,7 @@ def draw_detection(frame, box, label, confidence, color):
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.6
     thickness = 2
-    (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+    (text_width, text_height), _ = cv2.getTextSize(text, font, font_scale, thickness)
 
     # Draw background rectangle for text
     cv2.rectangle(frame, (x1, y1 - text_height - 10), (x1 + text_width + 5, y1), color, -1)
@@ -67,31 +86,53 @@ def draw_detection(frame, box, label, confidence, color):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Live card detection with webcam')
+    parser = argparse.ArgumentParser(description='Card detection with webcam or video file')
     parser.add_argument('--model', type=str, default='runs/detect/train/weights/best.pt',
                         help='Path to trained model')
     parser.add_argument('--camera', type=int, default=0, help='Camera index')
+    parser.add_argument('--video', type=str, help='Path to video file')
+    parser.add_argument('--latest', action='store_true', help='Use the most recent recording')
     parser.add_argument('--conf', type=float, default=0.5, help='Confidence threshold')
     parser.add_argument('--iou', type=float, default=0.45, help='IOU threshold for NMS')
-    parser.add_argument('--width', type=int, default=1280, help='Frame width')
-    parser.add_argument('--height', type=int, default=720, help='Frame height')
+    parser.add_argument('--width', type=int, default=1280, help='Frame width (camera only)')
+    parser.add_argument('--height', type=int, default=720, help='Frame height (camera only)')
     args = parser.parse_args()
 
     # Load model
     print(f"Loading model: {args.model}")
     model = YOLO(args.model)
 
-    # Open webcam
-    print(f"Opening camera {args.camera}...")
-    cap = cv2.VideoCapture(args.camera)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+    # Determine video source
+    video_source = None
+    is_video_file = False
+
+    if args.latest:
+        video_source = get_latest_recording()
+        if video_source is None:
+            print(" no recordings found in recordings folder")
+            return
+        is_video_file = True
+        print(f"using the most recent recording file : {video_source}")
+    elif args.video:
+        video_source = args.video
+        is_video_file = True
+    else:
+        video_source = args.camera
+        print(f"opening camera {args.camera}...")
+
+    # Open video source
+    cap = cv2.VideoCapture(video_source)
+
+    if not is_video_file:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
 
     if not cap.isOpened():
-        print("Error: Could not open camera")
+        print("camera could not be opend")
         return
 
-    print("Starting live detection. Press 'q' to quit.")
+    # Track all unique cards detected throughout the video
+    all_detected_cards = set()
 
     # FPS calculation
     fps_counter = 0
@@ -101,7 +142,10 @@ def main():
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Error: Failed to read frame")
+            if is_video_file:
+                print("vidoe complete")
+            else:
+                print("could not read cam frames")
             break
 
         # Run inference
@@ -123,6 +167,7 @@ def main():
                     # Get label
                     label = model.names[cls]
                     detected_cards.append((label, conf))
+                    all_detected_cards.add(format_card(label))
 
                     # Get color based on suit
                     color = get_color_for_card(label)
@@ -146,7 +191,7 @@ def main():
         if detected_cards:
             y_offset = 60
             cv2.putText(frame, "Detected:", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            for i, (card, conf) in enumerate(detected_cards[:10]):  # Show max 10
+            for card, _ in detected_cards[:10]:  # Show max 10
                 y_offset += 25
                 card_text = f"{CARD_NAMES.get(card, card)}"
                 color = get_color_for_card(card)
@@ -161,7 +206,11 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-    print("Detection stopped.")
+
+    # Return the list of all unique detected cards
+    cards_list = sorted(list(all_detected_cards))
+    print(f"Detected cards: {cards_list}")
+    return cards_list
 
 
 if __name__ == '__main__':
