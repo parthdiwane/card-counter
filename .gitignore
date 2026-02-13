@@ -2,7 +2,7 @@
 .env
 venv/
 .venv/
-
+model/recordings
 # Python
 __pycache__/
 *.py[cod]

@@ -10,7 +10,7 @@ from datetime import datetime
 # CONFIGS -- DO NOT TOUCH
 RECORDINGS_DIR = "/Users/parth/coding/projs/card-counter/model/recordings"
 
-def get_recordings(duration=7) -> str: 
+def get_recordings(duration=10) -> str: 
     """
         returns a string of the file path for the recordings
     """
