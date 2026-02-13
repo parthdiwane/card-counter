@@ -8,7 +8,8 @@ from ultralytics import YOLO
 import argparse
 from pathlib import Path
 
-# Card name mappings for better display
+
+# COFIGS IF CARD NAMES --> DO NOT CHANGE
 CARD_NAMES = {
     '10c': '10 of Clubs', '10d': '10 of Diamonds', '10h': '10 of Hearts', '10s': '10 of Spades',
     '2c': '2 of Clubs', '2d': '2 of Diamonds', '2h': '2 of Hearts', '2s': '2 of Spades',
@@ -25,7 +26,7 @@ CARD_NAMES = {
     'Qc': 'Queen of Clubs', 'Qd': 'Queen of Diamonds', 'Qh': 'Queen of Hearts', 'Qs': 'Queen of Spades',
 }
 
-# Colors for suits (BGR format)
+
 SUIT_COLORS = {
     'c': (0, 100, 0),      # Clubs - Dark Green
     'd': (0, 0, 255),      # Diamonds - Red
@@ -55,7 +56,7 @@ def get_latest_recording():
     if not recordings:
         return None
 
-    # Filenames are YYYYMMDD_HHMMSS.mp4, so sorting alphabetically gives chronological order
+    
     return str(recordings[-1])
 
 
@@ -102,7 +103,6 @@ def main():
     print(f"Loading model: {args.model}")
     model = YOLO(args.model)
 
-    # Determine video source
     video_source = None
     is_video_file = False
 
@@ -120,7 +120,7 @@ def main():
         video_source = args.camera
         print(f"opening camera {args.camera}...")
 
-    # Open video source
+    # open the most recent saved video from the file path
     cap = cv2.VideoCapture(video_source)
 
     if not is_video_file:
@@ -131,10 +131,10 @@ def main():
         print("camera could not be opend")
         return
 
-    # Track all unique cards detected throughout the video
+    
     all_detected_cards = set()
 
-    # FPS calculation
+   
     fps_counter = 0
     fps_start_time = cv2.getTickCount()
     fps_display = 0
@@ -148,18 +148,18 @@ def main():
                 print("could not read cam frames")
             break
 
-        # Run inference
+        
         results = model(frame, conf=args.conf, iou=args.iou, verbose=False)
 
-        # Track detected cards for display
+       
         detected_cards = []
 
-        # Process detections
+       
         for result in results:
             boxes = result.boxes
             if boxes is not None:
                 for box in boxes:
-                    # Get box coordinates
+                    
                     xyxy = box.xyxy[0].cpu().numpy()
                     conf = box.conf[0].cpu().numpy()
                     cls = int(box.cls[0].cpu().numpy())
@@ -169,13 +169,13 @@ def main():
                     detected_cards.append((label, conf))
                     all_detected_cards.add(format_card(label))
 
-                    # Get color based on suit
+                    # get the color of the suit
                     color = get_color_for_card(label)
 
-                    # Draw detection
+                   
                     frame = draw_detection(frame, xyxy, label, conf, color)
 
-        # Calculate FPS
+      
         fps_counter += 1
         if fps_counter >= 30:
             fps_end_time = cv2.getTickCount()
@@ -183,11 +183,11 @@ def main():
             fps_start_time = fps_end_time
             fps_counter = 0
 
-        # Draw FPS and card count
+        
         info_text = f"FPS: {fps_display:.1f} | Cards: {len(detected_cards)}"
         cv2.putText(frame, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-        # Draw detected cards list
+       
         if detected_cards:
             y_offset = 60
             cv2.putText(frame, "Detected:", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -197,17 +197,17 @@ def main():
                 color = get_color_for_card(card)
                 cv2.putText(frame, card_text, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-        # Display frame
+       
         cv2.imshow('Card Detection', frame)
 
-        # Check for quit
+    
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
-    # Return the list of all unique detected cards
+    
     cards_list = sorted(list(all_detected_cards))
     print(f"Detected cards: {cards_list}")
     return cards_list
