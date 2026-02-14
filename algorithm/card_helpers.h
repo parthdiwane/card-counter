@@ -229,4 +229,4 @@ inline std::map<int, double> dealerRecurse(int hand, std::map<int,int>& deck, in
 
 
 
-#endif // CARD_COUNTER_CARD_HELPERS_H
+#endif
