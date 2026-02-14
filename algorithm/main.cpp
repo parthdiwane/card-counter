@@ -13,11 +13,9 @@ struct GameState {
     map<int, double> dealer_dist;       // dealer's outcome distribution
 };
 
-// Calculate expected value if player stands
-// Inputs:
-//   - player_hand: player's current total
-//   - dealer_dist: probability distribution of dealer outcomes {17: p1, 18: p2, ..., 22: p_bust}
-// Returns: EV of standing (positive = player wins, negative = player loses)
+// calcutes standing ev for the player
+// inputs: player hand = current sum of players hand, dealer_dist is the key value mapping of the chance that the dealer has a hand from [17,22] 
+// returns standing ev based on the current player hand and dealer distrabution
 double standingEV(int player_hand, const map<int, double>& dealer_dist) {
     double ev = 0.0;
     for(const auto &[dealer_value, prob] : dealer_dist) {
