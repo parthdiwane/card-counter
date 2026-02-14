@@ -21,7 +21,7 @@ struct GameState {
 double standingEV(int player_hand, const map<int, double>& dealer_dist) {
     double ev = 0.0;
     for(const auto &[dealer_value, prob] : dealer_dist) {
-        if(dealer_value == 2) {
+        if(dealer_value > 21) {
             ev += prob;
         }
         else if(dealer_value < player_hand) {
