@@ -25,9 +25,9 @@ double standingEV(int player_hand, const map<int, double>& dealer_dist) {
             ev += prob;
         }
         else if(dealer_value < player_hand) {
-            ev += (-1 * prob);
-        } else if(dealer_value > player_hand) {
             ev += (1 * prob);
+        } else if(dealer_value > player_hand) {
+            ev += (-1 * prob);
         }
     }
     return ev;
