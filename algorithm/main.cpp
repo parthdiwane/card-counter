@@ -32,7 +32,7 @@ double standingEV(int player_hand, const map<int, double>& dealer_dist) {
 }
 // calculates the ev for standing 
 // inputs: player_hand = current sum for player hands, remaining mapping of {card value: count for card val}; remaining_count = number of cards remaining in the deck
-// returns hitting ev
+// returns hitting ev 
     double hittingEV(int player_hand, map<int, int>& remaining, int remaining_count,
                     const map<int, double>& dealer_dist) {
         double total_ev = 0.0;
@@ -92,15 +92,13 @@ bool shouldHit(const vector<int>& played, int num_decks = 1) {
 
     GameState state = buildGameState(played, num_decks);
 
-    // Edge cases
     if (state.player_hand == 0 || state.dealer_showing == 0) {
         return false;
     }
     if (state.player_hand >= 21) {
-        return false;  // already 21 or busted
+        return false; 
     }
 
-    // Calculate EVs
     double ev_stand = standingEV(state.player_hand, state.dealer_dist);
     double ev_hit = hittingEV(state.player_hand, state.remaining, state.remaining_count, state.dealer_dist);
 
@@ -110,10 +108,39 @@ bool shouldHit(const vector<int>& played, int num_decks = 1) {
 
 
 int main() {
-    // Example usage:
-    // vector<int> played = {10, 5, 10, 7};  // dealer: 10, 10  player: 5, 7
-    // bool hit = shouldHit(played);
-    // printf("Should hit: %s\n", hit ? "yes" : "no");
+    // test cases genreated by claude
+    struct TestCase {
+        vector<int> played;
+        bool expected;
+        const char* description;
+    };
 
+    vector<TestCase> tests = {
+        {{10, 10, 10, 10}, false, "Player 20 vs dealer 20 - should stand"},
+        {{6, 5, 10, 6}, true, "Player 11 vs dealer 16 - should hit"},
+        {{10, 8, 10, 8}, true, "Player 16 vs dealer 20 - should hit"},
+        {{2, 5, 10, 7}, true, "Player 12 vs dealer 12 - should hit"},
+        {{6, 9, 10, 10}, false, "Player 19 vs dealer 16 - should stand"},
+        {{10, 6, 10, 7}, true, "Player 13 vs dealer 20 - should hit"},
+    };
+
+    int passed = 0;
+    int failed = 0;
+
+    for (int i = 0; i < tests.size(); i++) {
+        bool result = shouldHit(tests[i].played);
+        if (result == tests[i].expected) {
+            printf("PASSED test %d: %s\n", i + 1, tests[i].description);
+            passed++;
+        } else {
+            printf("FAILED test %d: %s (expected %s, got %s)\n",
+                   i + 1, tests[i].description,
+                   tests[i].expected ? "hit" : "stand",
+                   result ? "hit" : "stand");
+            failed++;
+        }
+    }
+
+    printf("\nResults: %d/%d passed\n", passed, passed + failed);
     return 0;
 }
