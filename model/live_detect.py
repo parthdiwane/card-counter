@@ -42,8 +42,8 @@ def get_color_for_card(card_code):
 
 
 def format_card(card_code):
-    """Format card code to uppercase (e.g., '4s' -> '4S', 'Ah' -> 'AH')."""
-    return card_code.upper()
+    """Extract card value only, no suit (e.g., '4s' -> '4', 'Ah' -> 'A', '10c' -> '10')."""
+    return card_code[:-1].upper()
 
 
 def get_latest_recording():
