@@ -108,7 +108,6 @@ bool shouldHit(const vector<int>& played, int num_decks = 1) {
 
 
 int main() {
-    // test cases genreated by claude
     struct TestCase {
         vector<int> played;
         bool expected;
@@ -116,18 +115,61 @@ int main() {
     };
 
     vector<TestCase> tests = {
-        {{10, 10, 10, 10}, false, "Player 20 vs dealer 20 - should stand"},
-        {{6, 5, 10, 6}, true, "Player 11 vs dealer 16 - should hit"},
-        {{10, 8, 10, 8}, true, "Player 16 vs dealer 20 - should hit"},
-        {{2, 5, 10, 7}, true, "Player 12 vs dealer 12 - should hit"},
-        {{6, 9, 10, 10}, false, "Player 19 vs dealer 16 - should stand"},
-        {{10, 6, 10, 7}, true, "Player 13 vs dealer 20 - should hit"},
+        // Hard stands (high hands, should never hit)
+        {{10, 10, 10, 10}, false, "Player 20 vs dealer 20 - stand"},
+        {{6, 9, 10, 10}, false, "Player 19 vs dealer 16 - stand"},
+        {{10, 8, 10, 10}, false, "Player 18 vs dealer 20 - stand"},
+        {{5, 10, 10, 10}, false, "Player 20 vs dealer 15 - stand"},
+        {{9, 10, 10, 9}, false, "Player 19 vs dealer 19 - stand"},
+        {{7, 10, 10, 10}, false, "Player 20 vs dealer 17 - stand"},
+
+        // Player 17 vs various dealer upcards (should stand)
+        {{10, 7, 10, 10}, false, "Player 17 vs dealer 20 - stand"},
+        {{6, 7, 10, 10}, false, "Player 17 vs dealer 16 - stand"},
+        {{2, 9, 10, 8}, false, "Player 18 vs dealer 11 - stand"},
+
+        // Player 11 (should always hit, can't bust)
+        {{6, 5, 10, 6}, true, "Player 11 vs dealer 16 - hit"},
+        {{10, 4, 10, 7}, true, "Player 11 vs dealer 20 - hit"},
+        {{9, 3, 10, 8}, true, "Player 11 vs dealer 19 - hit"},
+        {{2, 6, 10, 5}, true, "Player 11 vs dealer 12 - hit"},
+
+        // Player 10 (should always hit, can't bust)
+        {{10, 4, 10, 6}, true, "Player 10 vs dealer 20 - hit"},
+        {{5, 3, 10, 7}, true, "Player 10 vs dealer 15 - hit"},
+        {{8, 4, 10, 6}, true, "Player 10 vs dealer 18 - hit"},
+
+        // Player 9 (should always hit, can't bust)
+        {{10, 5, 10, 4}, true, "Player 9 vs dealer 20 - hit"},
+        {{6, 2, 10, 7}, true, "Player 9 vs dealer 16 - hit"},
+
+        // Low hands (should always hit)
+        {{10, 3, 10, 5}, true, "Player 8 vs dealer 20 - hit"},
+        {{7, 2, 10, 5}, true, "Player 7 vs dealer 17 - hit"},
+        {{10, 3, 10, 3}, true, "Player 6 vs dealer 20 - hit"},
+        {{9, 2, 10, 4}, true, "Player 6 vs dealer 19 - hit"},
+
+        // Player 16 (should hit against strong dealer)
+        {{10, 8, 10, 8}, true, "Player 16 vs dealer 20 - hit"},
+        {{9, 7, 10, 9}, true, "Player 16 vs dealer 19 - hit"},
+        {{7, 6, 10, 10}, true, "Player 16 vs dealer 17 - hit"},
+
+        // Player 15 (should hit against strong dealer)
+        {{10, 6, 10, 9}, true, "Player 15 vs dealer 20 - hit"},
+        {{9, 8, 10, 7}, true, "Player 15 vs dealer 19 - hit"},
+
+        // Player 13-14 vs strong dealer (should hit)
+        {{10, 6, 10, 7}, true, "Player 13 vs dealer 20 - hit"},
+        {{10, 5, 10, 9}, true, "Player 14 vs dealer 20 - hit"},
+
+        // Player 12 vs weak dealer
+        {{2, 5, 10, 7}, true, "Player 12 vs dealer 12 - hit"},
     };
 
     int passed = 0;
     int failed = 0;
 
-    for (int i = 0; i < tests.size(); i++) {
+    for (int i = 0; i < (int)tests.size(); i++) {
         bool result = shouldHit(tests[i].played);
         if (result == tests[i].expected) {
             printf("PASSED test %d: %s\n", i + 1, tests[i].description);
