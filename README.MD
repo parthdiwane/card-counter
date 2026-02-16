@@ -23,6 +23,13 @@ This project combines computer vision with game theory to create a blackjack ass
 - Calculates expected value for hit/stand decisions
 - Recommends optimal plays based on remaining deck composition
 
+## Demo
+
+| Demo | Description |
+|------|-------------|
+| [Demo 1](model/recordings/Screen%20Recording%202026-02-15%20at%205.35.00%20PM.mov) | Card detection in action |
+| [Demo 2](model/recordings/Screen%20Recording%202026-02-15%20at%205.39.55%20PM.mov) | Full gameplay example |
+
 ## Project Structure
 
 ```
