@@ -147,7 +147,9 @@ mss
 
 <div align="center">
 
-**Built for educational purposes**
+**Built for educational purposes. We are not responsible for any losses or damages associated with using this technology.**
+
+**Developed By: Parth Diwane and Aarnav Koushik**
 
 </div>
 
