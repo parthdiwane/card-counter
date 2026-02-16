@@ -129,6 +129,37 @@ vector<int> parseCards(const string& input) {
     return cards;
 }
 
+// Sum all cards for a player or dealer from the played list
+// Player cards are at odd indices (1, 3, 5, ...)
+// Dealer cards are at even indices (0, 2, 4, ...)
+int sumHand(const vector<int>& played, bool for_player) {
+    int total = 0;
+    for (size_t i = 0; i < played.size(); i++) {
+        if (for_player && i % 2 == 1) {
+            total += played[i];
+        } else if (!for_player && i % 2 == 0) {
+            total += played[i];
+        }
+    }
+    return total;
+}
+
+// Get decision string: "HIT", "STAND", "PLAYER_BUST", or "DEALER_BUST"
+string getDecision(const vector<int>& cards) {
+    int player_total = sumHand(cards, true);
+    int dealer_total = sumHand(cards, false);
+
+    if (player_total > 21) {
+        return "PLAYER_BUST";
+    }
+    if (dealer_total > 21) {
+        return "DEALER_BUST";
+    }
+
+    bool hit = shouldHit(cards);
+    return hit ? "HIT" : "STAND";
+}
+
 int main(int argc, char* argv[]) {
     // If --stdin flag is provided, read cards from stdin and output decision
     if (argc > 1 && string(argv[1]) == "--stdin") {
@@ -142,8 +173,7 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            bool hit = shouldHit(cards);
-            cout << (hit ? "HIT" : "STAND") << endl;
+            cout << getDecision(cards) << endl;
         }
         return 0;
     }
@@ -155,8 +185,7 @@ int main(int argc, char* argv[]) {
             cout << "NEED_MORE_CARDS" << endl;
             return 1;
         }
-        bool hit = shouldHit(cards);
-        cout << (hit ? "HIT" : "STAND") << endl;
+        cout << getDecision(cards) << endl;
         return 0;
     }
 

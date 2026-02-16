@@ -2,7 +2,9 @@
 #
 # Card Counter - Detects cards from latest recording and outputs HIT/STAND decision
 #
-# Usage: ./run_counter.sh
+# Usage:
+#   ./run_counter.sh                  # Use latest recording
+#   ./run_counter.sh path/to/video.mp4  # Use specific video file
 #
 
 set -e
@@ -21,7 +23,12 @@ fi
 echo "=== Card Counter ==="
 echo ""
 
-CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py")
+# Check if a video path was provided
+if [ -n "$1" ]; then
+    CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py" --video "$1")
+else
+    CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py")
+fi
 
 if [ -z "$CARDS" ]; then
     echo "Failed to detect cards"

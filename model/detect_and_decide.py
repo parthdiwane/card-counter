@@ -76,38 +76,48 @@ def detect_cards(video_path, model, conf=0.5):
 
 def build_played_list(cards):
     """
-    Build alternating dealer/player list.
-    Assumes: first card = dealer showing, rest = player hand.
-    Format: [dealer1, player1, dealer2, player2, ...]
+    Build alternating dealer/player list for the C++ algorithm.
 
-    The C++ algorithm expects at least 4 cards.
-    For typical blackjack (1 dealer up + 2 player cards), we format as:
-    [dealer_up, player1, dealer_up, player2]
-    (dealer card repeated since we only see one)
+    Screen order (left to right): [player, dealer, player, dealer, ...]
+    - Even indices (0, 2, 4, ...) = player cards
+    - Odd indices (1, 3, 5, ...) = dealer cards
+
+    Algorithm expects: [dealer, player, dealer, player, ...]
+    - Even indices (0, 2, 4, ...) = dealer cards
+    - Odd indices (1, 3, 5, ...) = player cards
     """
-    if len(cards) < 3:
-        return []
+    if len(cards) < 2:
+        return [], [], []
 
-    # First card is dealer's showing card
-    dealer_up = cards[0][1]
-    # Remaining cards are player's hand
-    player_cards = [c[1] for c in cards[1:]]
+    # Extract player and dealer cards from screen order
+    player_cards = [cards[i][1] for i in range(0, len(cards), 2)]  # indices 0, 2, 4, ...
+    dealer_cards = [cards[i][1] for i in range(1, len(cards), 2)]  # indices 1, 3, 5, ...
 
-    # Build the format algorithm expects: [d, p, d, p, ...]
-    # We only know dealer's up card, so repeat it for each player card
+    # Build algorithm format: [dealer, player, dealer, player, ...]
     played = []
-    for player_card in player_cards:
-        played.append(dealer_up)
-        played.append(player_card)
+    max_len = max(len(dealer_cards), len(player_cards))
+    for i in range(max_len):
+        if i < len(dealer_cards):
+            played.append(dealer_cards[i])
+        if i < len(player_cards):
+            played.append(player_cards[i])
 
-    return played
+    return played, player_cards, dealer_cards
 
 
 def main():
-    video_path = get_latest_recording()
-    if not video_path:
-        print("ERROR: No recordings found", file=sys.stderr)
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description='Detect cards and output for algorithm')
+    parser.add_argument('--video', type=str, help='Path to specific video file')
+    args = parser.parse_args()
+
+    if args.video:
+        video_path = args.video
+    else:
+        video_path = get_latest_recording()
+        if not video_path:
+            print("ERROR: No recordings found", file=sys.stderr)
+            sys.exit(1)
 
     print(f"Processing: {video_path}", file=sys.stderr)
 
@@ -120,16 +130,17 @@ def main():
 
     print(f"Detected cards (left to right): {[c[0] for c in cards]}", file=sys.stderr)
 
-    # Extract dealer and player hands
-    dealer_showing = cards[0][1]
-    dealer_hand = [dealer_showing]
-    player_hand = [c[1] for c in cards[1:]]
-    player_total = sum(player_hand)
+    played, player_cards, dealer_cards = build_played_list(cards)
 
-    print(f"Dealer hand: {dealer_hand} (showing {dealer_showing})", file=sys.stderr)
-    print(f"Player hand: {player_hand} (total: {player_total})", file=sys.stderr)
+    if not played:
+        print("ERROR: Need at least 2 cards", file=sys.stderr)
+        sys.exit(1)
 
-    played = build_played_list(cards)
+    player_total = sum(player_cards)
+    dealer_total = sum(dealer_cards)
+
+    print(f"Player hand: {player_cards} (total: {player_total})", file=sys.stderr)
+    print(f"Dealer hand: {dealer_cards} (total: {dealer_total})", file=sys.stderr)
 
     # Output the comma-separated list for the algorithm
     print(",".join(map(str, played)))
