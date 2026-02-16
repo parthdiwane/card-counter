@@ -25,12 +25,13 @@ This project combines computer vision with game theory to create a blackjack ass
 
 ## Demo
 
-| Demo | Description |
-|------|-------------|
-| [Demo 1](https://github.com/user-attachments/assets/8e14fd42-f3c8-4fce-b0aa-a1febc32b74e
+### Card Detection in Action
 
-) | Card detection in action |
-| [Demo 2](model/recordings/Screen%20Recording%202026-02-15%20at%205.39.55%20PM.mov) | Full gameplay example |
+https://github.com/user-attachments/assets/8e14fd42-f3c8-4fce-b0aa-a1febc32b74e
+
+### Full Gameplay Example
+
+https://github.com/user-attachments/assets/REPLACE_WITH_DEMO2_URL
 
 ## Project Structure
 
