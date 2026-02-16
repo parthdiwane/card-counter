@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <vector>
 #include <map>
+#include <string>
+#include <sstream>
+#include <iostream>
 #include "card_helpers.h"
 
 using namespace std;
@@ -107,7 +110,57 @@ bool shouldHit(const vector<int>& played, int num_decks = 1) {
 
 
 
-int main() {
+// Parse comma-separated integers from string (e.g., "10,5,6,7")
+vector<int> parseCards(const string& input) {
+    vector<int> cards;
+    stringstream ss(input);
+    string token;
+    while (getline(ss, token, ',')) {
+        // Trim whitespace
+        size_t start = token.find_first_not_of(" \t\n\r");
+        size_t end = token.find_last_not_of(" \t\n\r");
+        if (start != string::npos && end != string::npos) {
+            token = token.substr(start, end - start + 1);
+        }
+        if (!token.empty()) {
+            cards.push_back(stoi(token));
+        }
+    }
+    return cards;
+}
+
+int main(int argc, char* argv[]) {
+    // If --stdin flag is provided, read cards from stdin and output decision
+    if (argc > 1 && string(argv[1]) == "--stdin") {
+        string line;
+        while (getline(cin, line)) {
+            if (line.empty()) continue;
+
+            vector<int> cards = parseCards(line);
+            if (cards.size() < 4) {
+                cout << "NEED_MORE_CARDS" << endl;
+                continue;
+            }
+
+            bool hit = shouldHit(cards);
+            cout << (hit ? "HIT" : "STAND") << endl;
+        }
+        return 0;
+    }
+
+    // If cards provided as argument, evaluate directly
+    if (argc > 1 && string(argv[1]) != "--test") {
+        vector<int> cards = parseCards(argv[1]);
+        if (cards.size() < 4) {
+            cout << "NEED_MORE_CARDS" << endl;
+            return 1;
+        }
+        bool hit = shouldHit(cards);
+        cout << (hit ? "HIT" : "STAND") << endl;
+        return 0;
+    }
+
+    // Default: run test cases
     struct TestCase {
         vector<int> played;
         bool expected;
