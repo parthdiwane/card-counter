@@ -27,7 +27,7 @@ def get_latest_recording():
     return str(recordings[-1]) if recordings else None
 
 
-def detect_cards(video_path, model, conf=0.5):
+def detect_cards(video_path, model, conf=0.7):
     """
     Detect cards and return them sorted by x-position (left to right).
     Returns list of (x_position, card_value_int) tuples.
@@ -93,14 +93,15 @@ def build_played_list(cards):
     player_cards = [cards[i][1] for i in range(0, len(cards), 2)]  # indices 0, 2, 4, ...
     dealer_cards = [cards[i][1] for i in range(1, len(cards), 2)]  # indices 1, 3, 5, ...
 
+    # Pad dealer_cards with 0s if player has more cards (to maintain alternating pattern)
+    while len(dealer_cards) < len(player_cards):
+        dealer_cards.append(0)
+
     # Build algorithm format: [dealer, player, dealer, player, ...]
     played = []
-    max_len = max(len(dealer_cards), len(player_cards))
-    for i in range(max_len):
-        if i < len(dealer_cards):
-            played.append(dealer_cards[i])
-        if i < len(player_cards):
-            played.append(player_cards[i])
+    for i in range(len(player_cards)):
+        played.append(dealer_cards[i])
+        played.append(player_cards[i])
 
     return played, player_cards, dealer_cards
 
