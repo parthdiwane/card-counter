@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""
-Simple script to detect cards from a video and output them as integers.
-Outputs cards sorted by x-position (left-to-right on screen).
-Assumes: leftmost card = dealer, rest = player cards.
-"""
+
 
 import sys
 from pathlib import Path
 from ultralytics import YOLO
 import cv2
 
-# Card value conversion
+# card value conversion
 CARD_TO_INT = {
     '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
     'J': 10, 'Q': 10, 'K': 10, 'A': 11
@@ -36,8 +32,8 @@ def detect_cards(video_path, model, conf=0.7):
     if not cap.isOpened():
         return []
 
-    # Track best detection for each unique card (highest confidence)
-    best_detections = {}  # card_code -> (x_pos, confidence, int_value)
+  
+    best_detections = {}  
 
     while True:
         ret, frame = cap.read()
@@ -54,50 +50,38 @@ def detect_cards(video_path, model, conf=0.7):
                     conf_val = float(box.conf[0].cpu().numpy())
                     label = model.names[cls]  # e.g., '4s', 'Ah'
 
-                    # Get x position (center of bounding box)
+                    # get x position (center of bounding box)
                     xyxy = box.xyxy[0].cpu().numpy()
                     x_center = (xyxy[0] + xyxy[2]) / 2
 
-                    # Extract value (remove suit)
+
                     card_value = label[:-1].upper()
                     int_value = CARD_TO_INT.get(card_value, 0)
 
-                    # Keep best detection per card code
                     if label not in best_detections or conf_val > best_detections[label][1]:
                         best_detections[label] = (x_center, conf_val, int_value, card_value)
 
     cap.release()
 
-    # Sort by x position (left to right)
     sorted_cards = sorted(best_detections.values(), key=lambda x: x[0])
 
     return [(c[3], c[2]) for c in sorted_cards]  # (card_str, int_value)
 
 
 def build_played_list(cards):
-    """
-    Build alternating dealer/player list for the C++ algorithm.
 
-    Screen order (left to right): [player, dealer, player, dealer, ...]
-    - Even indices (0, 2, 4, ...) = player cards
-    - Odd indices (1, 3, 5, ...) = dealer cards
-
-    Algorithm expects: [dealer, player, dealer, player, ...]
-    - Even indices (0, 2, 4, ...) = dealer cards
-    - Odd indices (1, 3, 5, ...) = player cards
-    """
     if len(cards) < 2:
         return [], [], []
 
-    # Extract player and dealer cards from screen order
+    
     player_cards = [cards[i][1] for i in range(0, len(cards), 2)]  # indices 0, 2, 4, ...
     dealer_cards = [cards[i][1] for i in range(1, len(cards), 2)]  # indices 1, 3, 5, ...
 
-    # Pad dealer_cards with 0s if player has more cards (to maintain alternating pattern)
+   # pad w/ zeros if the number of cards in the dist is diff
     while len(dealer_cards) < len(player_cards):
         dealer_cards.append(0)
 
-    # Build algorithm format: [dealer, player, dealer, player, ...]
+
     played = []
     for i in range(len(player_cards)):
         played.append(dealer_cards[i])
@@ -143,7 +127,7 @@ def main():
     print(f"Player hand: {player_cards} (total: {player_total})", file=sys.stderr)
     print(f"Dealer hand: {dealer_cards} (total: {dealer_total})", file=sys.stderr)
 
-    # Output the comma-separated list for the algorithm
+    
     print(",".join(map(str, played)))
 
 

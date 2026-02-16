@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-"""
-Card Counter Integration Script
-
-Records screen, detects cards using YOLO, and sends to the C++ algorithm
-for hit/stand decisions.
-
-Usage:
-    python card_counter.py                    # Live screen capture mode
-    python card_counter.py --record 10        # Record for 10 seconds first
-    python card_counter.py --latest           # Use most recent recording
-    python card_counter.py --video path.mp4   # Use specific video file
-"""
 
 import cv2
 import subprocess
@@ -22,18 +9,15 @@ import mss
 import time
 from datetime import datetime
 
-# Add model directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 from ultralytics import YOLO
 
-# Card value conversion: string card values to blackjack integer values
 CARD_TO_INT = {
     '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
     'J': 10, 'Q': 10, 'K': 10, 'A': 11
 }
 
-# Paths
 MODEL_PATH = Path(__file__).parent.parent / "runs/detect/train/weights/best.pt"
 ALGORITHM_PATH = Path(__file__).parent.parent / "algorithm" / "alg"
 RECORDINGS_DIR = Path(__file__).parent / "recordings"
@@ -42,7 +26,7 @@ RECORDINGS_DIR = Path(__file__).parent / "recordings"
 def card_string_to_value(card_str: str) -> int:
     """Convert card string (e.g., '10', 'A', 'K') to blackjack integer value."""
     card_str = card_str.upper().strip()
-    # Handle card codes like '10c', 'Ah' - extract just the value
+
     if len(card_str) > 1 and card_str[-1].lower() in 'cdhs':
         card_str = card_str[:-1]
     return CARD_TO_INT.get(card_str, 0)
@@ -92,10 +76,7 @@ def get_latest_recording() -> str:
 
 
 def detect_cards_in_video(video_source, model, conf=0.5) -> list:
-    """
-    Detect cards in video and return list of unique card values.
-    Returns list of integers (blackjack values).
-    """
+   
     cap = cv2.VideoCapture(video_source)
     if not cap.isOpened():
         print(f"Could not open video source: {video_source}")
@@ -133,20 +114,6 @@ def detect_cards_in_video(video_source, model, conf=0.5) -> list:
 
 
 def detect_cards_live(model, conf=0.5, display=True) -> list:
-    """
-    Live screen capture with real-time card detection.
-    Press 'q' to quit and get the final card list.
-    Press 'c' to clear detected cards.
-    Press 'enter' to send current cards to algorithm.
-    """
-    print("Starting live detection...")
-    print("Controls:")
-    print("  'q' - Quit")
-    print("  'c' - Clear detected cards")
-    print("  'enter' - Send cards to algorithm")
-    print("  'd' - Add card as DEALER card")
-    print("  'p' - Add card as PLAYER card")
-    print()
 
     with mss.mss() as sct:
         monitor = sct.monitors[1]  # Primary monitor
@@ -240,12 +207,7 @@ def detect_cards_live(model, conf=0.5, display=True) -> list:
 
 
 def build_played_list(dealer_cards: list, player_cards: list) -> list:
-    """
-    Build the alternating [dealer, player, dealer, player, ...] list
-    that the C++ algorithm expects.
 
-    Returns list of integers (blackjack values).
-    """
     played = []
     max_len = max(len(dealer_cards), len(player_cards))
 
@@ -259,15 +221,6 @@ def build_played_list(dealer_cards: list, player_cards: list) -> list:
 
 
 def get_algorithm_decision(cards: list) -> str:
-    """
-    Send card list to C++ algorithm and get hit/stand decision.
-
-    Args:
-        cards: List of integers (blackjack values) in alternating dealer/player order
-
-    Returns:
-        'HIT', 'STAND', or error message
-    """
     if not ALGORITHM_PATH.exists():
         # Try to compile
         print("Compiling algorithm...")
