@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/8e14fd42-f3c8-4fce-b0aa-a1febc32b74e
 
 ### Full Gameplay Example
 
-https://github.com/user-attachments/assets/REPLACE_WITH_DEMO2_URL
+https://github.com/user-attachments/assets/055eb7a2-118c-4e09-86d8-228efabf4f95
 
 ## Project Structure
 
