@@ -1,6 +1,27 @@
+<div align="center">
+
 # Card Counter
 
-Real-time playing card detection and blackjack decision engine. Uses YOLOv8 for card recognition and expected value calculations to determine optimal play.
+**Real-time playing card detection and blackjack decision engine**
+
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![YOLOv8](https://img.shields.io/badge/YOLOv8-Computer%20Vision-00FFFF?style=for-the-badge)](https://github.com/ultralytics/ultralytics)
+[![C++](https://img.shields.io/badge/C++-Algorithm-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)](https://isocpp.org)
+
+Uses YOLOv8 for card recognition and expected value calculations to determine optimal play.
+
+</div>
+
+---
+
+## Overview
+
+This project combines computer vision with game theory to create a blackjack assistant that:
+
+- Detects playing cards in real-time using a custom-trained YOLOv8 model
+- Tracks cards seen throughout the game
+- Calculates expected value for hit/stand decisions
+- Recommends optimal plays based on remaining deck composition
 
 ## Project Structure
 
@@ -18,11 +39,26 @@ card-counter/
 └── runs/                   # Trained model weights
 ```
 
-## Setup
+## Getting Started
+
+### Prerequisites
+
+- Python 3.8+
+- C++ compiler (for algorithm)
+- Webcam or screen capture capability
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/card-counter.git
+cd card-counter
+
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -40,13 +76,13 @@ python live_detect.py
 python live_detect.py --latest
 
 # Process specific video file
-python live_detect.py --video recordings/20260212_165642.mp4
+python live_detect.py --video recordings/your_video.mp4
 
 # Adjust confidence threshold
 python live_detect.py --latest --conf 0.7
 ```
 
-Output: List of detected card values (e.g., `['4', '10', 'A', 'K']`)
+**Output:** List of detected card values (e.g., `['4', '10', 'A', 'K']`)
 
 ### Screen Recording
 
@@ -55,7 +91,7 @@ cd model
 python screen_record.py  # Records 7 seconds, saves to recordings/
 ```
 
-### Training
+### Training Your Own Model
 
 ```bash
 cd model
@@ -64,25 +100,57 @@ python train.py --epochs 50 --batch 16 --device mps  # or 'cuda', 'cpu'
 
 ## Model Performance
 
-- **mAP@0.5**: 0.83 (at 50% confidence)
-- **Classes**: 52 (full deck: 2-10, J, Q, K, A × 4 suits)
+| Metric | Value |
+|--------|-------|
+| **mAP@0.5** | 0.83 |
+| **Classes** | 52 (full deck) |
+| **Cards** | 2-10, J, Q, K, A × 4 suits |
 
-## Algorithm
+## How the Algorithm Works
 
 The decision engine calculates expected value for hitting vs standing:
 
-1. Track cards seen → compute remaining deck
-2. Simulate dealer outcomes via `dealerRecurse()` (dealer hits <17, stands 17+)
-3. Calculate `standingEV()` and `hittingEV()`
-4. Hit if `hittingEV > standingEV`
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. Track cards seen → compute remaining deck           │
+│  2. Simulate dealer outcomes via dealerRecurse()        │
+│     (dealer hits <17, stands 17+)                       │
+│  3. Calculate standingEV() and hittingEV()              │
+│  4. Hit if hittingEV > standingEV                       │
+└─────────────────────────────────────────────────────────┘
+```
 
 ```cpp
 bool shouldHit(const vector<int>& played, int num_decks = 1);
 ```
 
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Card Detection | YOLOv8 (Ultralytics) |
+| Video Processing | OpenCV |
+| Deep Learning | PyTorch |
+| Screen Capture | MSS |
+| Decision Engine | C++ |
+
 ## Dependencies
 
-- ultralytics (YOLOv8)
-- opencv-python
-- torch
-- mss (screen capture)
+```
+ultralytics
+opencv-python
+torch
+mss
+```
+
+---
+
+<div align="center">
+
+**Built for educational purposes**
+
+</div>
+
+---
+
+> **Disclaimer:** This README was generated using Claude and may contain inaccuracies. If you encounter any issues, please email: parthdiwane@ucsb.edu
