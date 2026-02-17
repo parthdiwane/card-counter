@@ -1,9 +1,10 @@
 import cv2
-import numpy as np 
-import mss 
+import numpy as np
+import mss
 import time
 import os
 import glob
+import sys
 from datetime import datetime
 
 
@@ -30,7 +31,7 @@ def get_recordings(duration=10) -> str:
         out = cv2.VideoWriter(filepath, fourcc, FPS, (w, h))
 
         frame_time = 1 / FPS
-        print('recording')
+        print('Recording...', file=sys.stderr)
         start_time = time.time()
         while time.time() - start_time < duration:
             start = time.time()  # frame timer
@@ -44,4 +45,5 @@ def get_recordings(duration=10) -> str:
         out.release()
         return filepath
 if __name__ == "__main__":
-    get_recordings()
+    filepath = get_recordings()
+    print(filepath)

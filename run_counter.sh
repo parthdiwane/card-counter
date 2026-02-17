@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Card Counter - Detects cards from latest recording and outputs HIT/STAND decision
+# Card Counter - Records screen, detects cards, and outputs HIT/STAND decision
 #
 # Usage:
-#   ./run_counter.sh                  # Use latest recording
-#   ./run_counter.sh path/to/video.mp4  # Use specific video file
+#   ./run_counter.sh                  # Record screen, then detect cards
+#   ./run_counter.sh path/to/video.mp4  # Use specific video file (skip recording)
 #
 
 set -e
@@ -19,23 +19,31 @@ if [ ! -f "$ALGO_DIR/alg" ]; then
     g++ -std=c++17 -O2 -o "$ALGO_DIR/alg" "$ALGO_DIR/main.cpp"
 fi
 
-# Run detection and get card list
 echo "=== Card Counter ==="
 echo ""
 
 # Check if a video path was provided
 if [ -n "$1" ]; then
-    CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py" --video "$1")
+    VIDEO_PATH="$1"
+    echo "Using provided video: $VIDEO_PATH"
 else
-    CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py")
+    # Step 1: Screen recording
+    echo "Step 1: Recording screen..."
+    VIDEO_PATH=$(python3 "$MODEL_DIR/screen_record.py")
+    echo "Recording saved to: $VIDEO_PATH"
 fi
+
+echo ""
+echo "Step 2: Detecting cards..."
+CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py" --video "$VIDEO_PATH")
 
 if [ -z "$CARDS" ]; then
     echo "Failed to detect cards"
     exit 1
 fi
 
-# Get decision from algorithm
+echo ""
+echo "Step 3: Running decision algorithm..."
 DECISION=$("$ALGO_DIR/alg" "$CARDS")
 
 echo ""
