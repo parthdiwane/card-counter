@@ -25,11 +25,11 @@ This project combines computer vision with game theory to create a blackjack ass
 
 ## Demo
 
-### Card Detection in Action
+### EV Algorithm
 
 https://github.com/user-attachments/assets/8e14fd42-f3c8-4fce-b0aa-a1febc32b74e
 
-### Full Gameplay Example
+### Vision Model
 
 https://github.com/user-attachments/assets/055eb7a2-118c-4e09-86d8-228efabf4f95
 
