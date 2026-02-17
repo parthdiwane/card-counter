@@ -11,16 +11,17 @@ from datetime import datetime
 # CONFIGS -- DO NOT TOUCH
 RECORDINGS_DIR = "/Users/parth/coding/projs/card-counter/model/recordings"
 
-def get_recordings(duration=10) -> str: 
+def get_recordings(duration=15) -> str: 
     """
         returns a string of the file path for the recordings
     """
-    # configs 
+    # configs
     FPS = 30
-    MONITOR_NUM = 1 # limit to primary monitor only
+    # mss monitor indices: 0=all screens, 1=laptop display, 2=external monitor
+    MONITOR_NUM = 2
     with mss.mss() as sct:
 
-        monitor = sct.monitors[MONITOR_NUM]
+        monitor = sct.monitors[1]
         w = monitor["width"] # get width 
         h = monitor["height"] # get jeight
 
