@@ -154,6 +154,7 @@ def main():
        
         detected_cards = []
 
+        boxes = []
        
         for result in results:
             boxes = result.boxes
@@ -161,6 +162,9 @@ def main():
                 for box in boxes:
                     
                     xyxy = box.xyxy[0].cpu().numpy()
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    center_x = (x1 + x2) / 2
+                    center_y = (y1 + y2) / 2
                     conf = box.conf[0].cpu().numpy()
                     cls = int(box.cls[0].cpu().numpy())
 
@@ -168,6 +172,16 @@ def main():
                     label = model.names[cls]
                     detected_cards.append((label, conf))
                     all_detected_cards.add(format_card(label))
+
+                    # get the pixel coords for the boxes --> gonna be used for distnaces
+                    boxes.append(
+                        {'x1': x1, 
+                         'y1': y1, 
+                         'x2': x2, 
+                         'y2': y2, 
+                         'center_x': center_x, 
+                         'center_y': center_y}
+                    )
 
                     # get the color of the suit
                     color = get_color_for_card(label)
