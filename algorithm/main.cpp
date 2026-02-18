@@ -9,8 +9,9 @@
 using namespace std;
 
 struct GameState {
-    int player_hand;                   
-    int dealer_showing;                
+    int player_hand;
+    bool player_soft;                   // true if player hand has an ace counted as 11
+    int dealer_showing;
     map<int, int> remaining;            // cards left in shoe
     int remaining_count;                // total cards left
     map<int, double> dealer_dist;       // dealer's outcome distribution
@@ -33,41 +34,36 @@ double standingEV(int player_hand, const map<int, double>& dealer_dist) {
     }
     return ev;
 }
-// calculates the ev for standing 
-// inputs: player_hand = current sum for player hands, remaining mapping of {card value: count for card val}; remaining_count = number of cards remaining in the deck
-// returns hitting ev 
-    double hittingEV(int player_hand, map<int, int>& remaining, int remaining_count,
-                    const map<int, double>& dealer_dist) {
-        double total_ev = 0.0;
-        for(auto& [card_value, count] : remaining) {
-            if(count == 0) {
-                continue;
-            }
-            double p_draw = count / (double) remaining_count;
-            int new_hand = player_hand + card_value; 
-            
+// calculates the ev for hitting
+// soft_ace: whether the current player hand has an ace counted as 11
+double hittingEV(int player_hand, bool soft_ace, map<int, int>& remaining, int remaining_count,
+                const map<int, double>& dealer_dist) {
+    double total_ev = 0.0;
+    for(auto& [card_value, count] : remaining) {
+        if(count == 0) continue;
+        double p_draw = count / (double) remaining_count;
 
-            if(new_hand > 21) {
-                total_ev += -1 * p_draw; // base case
-            } else {
-                count -= 1;
-                remaining_count -= 1;
+        auto [new_hand, new_soft] = addCard(player_hand, soft_ace, card_value);
 
+        if(new_hand > 21) {
+            total_ev += -1 * p_draw; // bust
+        } else {
+            count -= 1;
+            remaining_count -= 1;
 
-                double ev_stand = standingEV(new_hand, dealer_dist);
-                double ev_hit = hittingEV(new_hand, remaining, remaining_count, dealer_dist); // backtrack
+            double ev_stand = standingEV(new_hand, dealer_dist);
+            double ev_hit = hittingEV(new_hand, new_soft, remaining, remaining_count, dealer_dist);
 
-                total_ev += max(ev_hit, ev_stand) * p_draw;
-                count += 1; // undo backtrack decison for the count and remaining count
-                remaining_count += 1;
-            }
-
+            total_ev += max(ev_hit, ev_stand) * p_draw;
+            count += 1;
+            remaining_count += 1;
         }
-        return total_ev;
     }
+    return total_ev;
+}
 
 
-GameState buildGameState(const vector<int>& played, int num_decks = 1) {
+GameState buildGameState(const vector<int>& played, int num_decks = 1, bool softhit = false) {
     GameState state;
 
     HandStats player_stats = compute_hand_stats(played, true);
@@ -76,34 +72,44 @@ GameState buildGameState(const vector<int>& played, int num_decks = 1) {
     state.player_hand = player_stats.last_two_sum;
     state.dealer_showing = dealer_stats.last_two_sum;
 
+    // Detect whether the player's starting two-card hand is soft
+    vector<int> player_cards = evens(played);
+    state.player_soft = false;
+    if (player_cards.size() >= 2) {
+        int c1 = player_cards[player_cards.size() - 2];
+        int c2 = player_cards[player_cards.size() - 1];
+        state.player_soft = (c1 == 11 || c2 == 11) && state.player_hand <= 21;
+    }
+
     state.remaining = remaining_deck_counts(played, num_decks);
     state.remaining_count = 0;
     for (const auto& p : state.remaining) {
         state.remaining_count += p.second;
     }
 
-    state.dealer_dist = dealerRecurse(state.dealer_showing, state.remaining, state.remaining_count);
+    bool dealer_soft = (state.dealer_showing == 11);
+    state.dealer_dist = dealerRecurse(state.dealer_showing, dealer_soft, state.remaining, state.remaining_count, softhit);
 
     return state;
 }
 
 
-bool shouldHit(const vector<int>& played, int num_decks = 1) {
+bool shouldHit(const vector<int>& played, int num_decks = 1, bool softhit = false) {
     if (played.size() < 2) {
         return false;
     }
 
-    GameState state = buildGameState(played, num_decks);
+    GameState state = buildGameState(played, num_decks, softhit);
 
     if (state.player_hand == 0 || state.dealer_showing == 0) {
         return false;
     }
     if (state.player_hand >= 21) {
-        return false; 
+        return false;
     }
 
     double ev_stand = standingEV(state.player_hand, state.dealer_dist);
-    double ev_hit = hittingEV(state.player_hand, state.remaining, state.remaining_count, state.dealer_dist);
+    double ev_hit = hittingEV(state.player_hand, state.player_soft, state.remaining, state.remaining_count, state.dealer_dist);
 
     return ev_hit > ev_stand;
 }

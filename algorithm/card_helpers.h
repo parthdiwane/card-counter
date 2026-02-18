@@ -109,6 +109,33 @@ inline std::map<int,int> remaining_deck_counts(const std::vector<int> &played, i
 }
 
 
+// Compute the next hand total and softness after drawing a card.
+// An ace (11) is counted as 11 if it doesn't bust a non-soft hand; otherwise as 1.
+// If adding any card busts a soft hand, the soft ace is re-valued to 1 (subtract 10).
+inline std::pair<int, bool> addCard(int hand, bool soft_ace, int card) {
+    int new_hand;
+    bool new_soft;
+    if (card == 11) {
+        // Count ace as 11 only if we don't already have a soft ace and it doesn't bust
+        if (!soft_ace && hand + 11 <= 21) {
+            new_hand = hand + 11;
+            new_soft = true;
+        } else {
+            new_hand = hand + 1;   // ace forced to 1
+            new_soft = soft_ace;
+        }
+    } else {
+        new_hand = hand + card;
+        new_soft = soft_ace;
+    }
+    // Re-value the soft ace if we busted
+    if (new_hand > 21 && new_soft) {
+        new_hand -= 10;
+        new_soft = false;
+    }
+    return {new_hand, new_soft};
+}
+
 // inline std::map<int, double> dealer_probs(int dealer_hand, std::map<int, int> remaining){
 //     if(dealer_hand > 21){
 //         return {{22, 1.0}};
@@ -194,29 +221,31 @@ inline HandStats compute_hand_stats(const std::vector<int> &played, bool for_pla
     }
     return s;
 }
-inline std::map<int, double> dealerRecurse(int hand, std::map<int,int>& deck, int deck_size){
-    // base cases
-    // bust
+// soft_ace: whether the current hand has an ace counted as 11
+// softhit:  if true, dealer hits soft 17 (standard H17 casino rule toggle)
+inline std::map<int, double> dealerRecurse(int hand, bool soft_ace, std::map<int,int>& deck, int deck_size, bool softhit = false){
+    // bust - return exact bust value
     if(hand > 21){
-        return {{22, 1.0}};
+        return {{hand, 1.0}};
     }
-    // must stand (dealer stands on 17+)
-    if(hand >= 17){
+    // stand on 17+, but hit soft 17 when softhit=true
+    bool hit_more = hand < 17 || (hand == 17 && soft_ace && softhit);
+    if(!hit_more){
         return {{hand, 1.0}};
     }
 
-    std::map<int,double> totalProbs = {{17, 0.0},{18, 0.0},{19, 0.0},{20, 0.0},{21, 0.0},{22, 0.0}};
+    std::map<int,double> totalProbs = {{17, 0.0},{18, 0.0},{19, 0.0},{20, 0.0},{21, 0.0},
+                                       {22, 0.0},{23, 0.0},{24, 0.0},{25, 0.0},{26, 0.0},{27, 0.0}};
 
     for(const auto &p : deck){
-        if (p.second == 0){
-            continue;
-        }
+        if (p.second == 0) continue;
         double draw_prob = static_cast<double>(p.second) / deck_size;
 
-        // Temporarily remove card from deck for recursion
+        auto [new_hand, new_soft] = addCard(hand, soft_ace, p.first);
+
         deck[p.first]--;
-        std::map<int,double> branchProb = dealerRecurse(hand + p.first, deck, deck_size - 1);
-        deck[p.first]++;  // restore card
+        std::map<int,double> branchProb = dealerRecurse(new_hand, new_soft, deck, deck_size - 1, softhit);
+        deck[p.first]++;
 
         for(const auto &outcome : branchProb){
             totalProbs[outcome.first] += draw_prob * outcome.second;
