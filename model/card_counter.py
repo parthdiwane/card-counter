@@ -1,7 +1,5 @@
-
 import cv2
 import subprocess
-import sys
 from pathlib import Path
 import argparse
 import numpy as np
@@ -9,18 +7,16 @@ import mss
 import time
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent))
+from detector import (
+    load_model,
+    detect_cards_in_frame,
+    get_latest_recording,
+    CARD_TO_INT,
+    MODEL_PATH,
+    RECORDINGS_DIR,
+)
 
-from ultralytics import YOLO
-
-CARD_TO_INT = {
-    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-    'J': 10, 'Q': 10, 'K': 10, 'A': 11
-}
-
-MODEL_PATH = Path(__file__).parent.parent / "runs/detect/train/weights/best.pt"
 ALGORITHM_PATH = Path(__file__).parent.parent / "algorithm" / "alg"
-RECORDINGS_DIR = Path(__file__).parent / "recordings"
 
 
 def card_string_to_value(card_str: str) -> int:
@@ -67,16 +63,7 @@ def record_screen(duration: float = 10.0) -> str:
         return filepath
 
 
-def get_latest_recording() -> str:
-    """Get the most recent recording from the recordings folder."""
-    if not RECORDINGS_DIR.exists():
-        return None
-    recordings = sorted(RECORDINGS_DIR.glob("*.mp4"))
-    return str(recordings[-1]) if recordings else None
-
-
 def detect_cards_in_video(video_source, model, conf=0.5) -> list:
-   
     cap = cv2.VideoCapture(video_source)
     if not cap.isOpened():
         print(f"Could not open video source: {video_source}")
@@ -94,18 +81,11 @@ def detect_cards_in_video(video_source, model, conf=0.5) -> list:
 
         frame_count += 1
 
-        # Run detection
-        results = model(frame, conf=conf, verbose=False)
+        # Run detection using shared detector
+        detections = detect_cards_in_frame(model, frame, conf=conf)
 
-        for result in results:
-            boxes = result.boxes
-            if boxes is not None:
-                for box in boxes:
-                    cls = int(box.cls[0].cpu().numpy())
-                    label = model.names[cls]
-                    # Extract just the value (e.g., '4s' -> '4', 'Ah' -> 'A')
-                    card_value = label[:-1].upper()
-                    all_detected_cards.add(card_value)
+        for det in detections:
+            all_detected_cards.add(det.card_value)
 
     cap.release()
     print(f"Processed {frame_count} frames")
@@ -132,26 +112,21 @@ def detect_cards_live(model, conf=0.5, display=True) -> list:
             scale = 0.5
             display_frame = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
 
-            # Run detection
-            results = model(frame, conf=conf, verbose=False)
+            # Run detection using shared detector
+            detections = detect_cards_in_frame(model, frame, conf=conf)
 
             current_frame_cards.clear()
-            for result in results:
-                boxes = result.boxes
-                if boxes is not None:
-                    for box in boxes:
-                        cls = int(box.cls[0].cpu().numpy())
-                        label = model.names[cls]
-                        card_value = label[:-1].upper()
-                        current_frame_cards.add(card_value)
+            for det in detections:
+                current_frame_cards.add(det.card_value)
 
-                        # Draw on display frame
-                        xyxy = box.xyxy[0].cpu().numpy() * scale
-                        x1, y1, x2, y2 = map(int, xyxy)
-                        conf_val = box.conf[0].cpu().numpy()
-                        cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        cv2.putText(display_frame, f"{card_value} ({conf_val:.0%})",
-                                    (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                # Draw on display frame (scale coordinates)
+                x1 = int(det.x1 * scale)
+                y1 = int(det.y1 * scale)
+                x2 = int(det.x2 * scale)
+                y2 = int(det.y2 * scale)
+                cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(display_frame, f"{det.card_value} ({det.confidence:.0%})",
+                            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             # Display info
             info_y = 30
@@ -265,9 +240,8 @@ def main():
                         help='Disable visual display (for headless mode)')
     args = parser.parse_args()
 
-    # Load model
-    print(f"Loading model: {args.model}")
-    model = YOLO(args.model)
+    # Load model using shared loader
+    model = load_model(args.model)
 
     if args.record:
         # Record then process

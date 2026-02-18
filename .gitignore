@@ -4,6 +4,7 @@ venv/
 .venv/
 model/recordings
 demos
+.claude
 # Python
 __pycache__/
 *.py[cod]

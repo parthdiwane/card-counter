@@ -4,72 +4,26 @@ Displays bounding boxes with card labels in real-time.
 """
 
 import cv2
-from ultralytics import YOLO
 import argparse
-from pathlib import Path
+
+from detector import (
+    load_model,
+    detect_cards_in_frame,
+    get_latest_recording,
+    CARD_NAMES,
+)
 
 
-# COFIGS IF CARD NAMES --> DO NOT CHANGE
-CARD_NAMES = {
-    '10c': '10 of Clubs', '10d': '10 of Diamonds', '10h': '10 of Hearts', '10s': '10 of Spades',
-    '2c': '2 of Clubs', '2d': '2 of Diamonds', '2h': '2 of Hearts', '2s': '2 of Spades',
-    '3c': '3 of Clubs', '3d': '3 of Diamonds', '3h': '3 of Hearts', '3s': '3 of Spades',
-    '4c': '4 of Clubs', '4d': '4 of Diamonds', '4h': '4 of Hearts', '4s': '4 of Spades',
-    '5c': '5 of Clubs', '5d': '5 of Diamonds', '5h': '5 of Hearts', '5s': '5 of Spades',
-    '6c': '6 of Clubs', '6d': '6 of Diamonds', '6h': '6 of Hearts', '6s': '6 of Spades',
-    '7c': '7 of Clubs', '7d': '7 of Diamonds', '7h': '7 of Hearts', '7s': '7 of Spades',
-    '8c': '8 of Clubs', '8d': '8 of Diamonds', '8h': '8 of Hearts', '8s': '8 of Spades',
-    '9c': '9 of Clubs', '9d': '9 of Diamonds', '9h': '9 of Hearts', '9s': '9 of Spades',
-    'Ac': 'Ace of Clubs', 'Ad': 'Ace of Diamonds', 'Ah': 'Ace of Hearts', 'As': 'Ace of Spades',
-    'Jc': 'Jack of Clubs', 'Jd': 'Jack of Diamonds', 'Jh': 'Jack of Hearts', 'Js': 'Jack of Spades',
-    'Kc': 'King of Clubs', 'Kd': 'King of Diamonds', 'Kh': 'King of Hearts', 'Ks': 'King of Spades',
-    'Qc': 'Queen of Clubs', 'Qd': 'Queen of Diamonds', 'Qh': 'Queen of Hearts', 'Qs': 'Queen of Spades',
-}
-
-
-SUIT_COLORS = {
-    'c': (0, 100, 0),      # Clubs - Dark Green
-    'd': (0, 0, 255),      # Diamonds - Red
-    'h': (0, 0, 200),      # Hearts - Red
-    's': (100, 100, 100),  # Spades - Gray
-}
-
-
-def get_color_for_card(card_code):
-    """Get display color based on suit."""
-    suit = card_code[-1]
-    return SUIT_COLORS.get(suit, (255, 255, 255))
-
-
-def format_card(card_code):
-    """Extract card value only, no suit (e.g., '4s' -> '4', 'Ah' -> 'A', '10c' -> '10')."""
-    return card_code[:-1].upper()
-
-
-def get_latest_recording():
-    """Get the most recent recording from the recordings folder."""
-    recordings_dir = Path(__file__).parent / "recordings"
-    if not recordings_dir.exists():
-        return None
-
-    recordings = sorted(recordings_dir.glob("*.mp4"))
-    if not recordings:
-        return None
-
-    
-    return str(recordings[-1])
-
-
-def draw_detection(frame, box, label, confidence, color):
+def draw_detection(frame, detection):
     """Draw bounding box and label on frame."""
-    x1, y1, x2, y2 = map(int, box)
+    x1, y1, x2, y2 = detection.x1, detection.y1, detection.x2, detection.y2
+    color = detection.color
 
     # Draw bounding box
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
     # Prepare label text
-    display_name = CARD_NAMES.get(label, label)
-    text = f"{display_name} ({confidence:.0%})"
+    text = f"{detection.display_name} ({detection.confidence:.0%})"
 
     # Calculate text size for background
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -88,7 +42,7 @@ def draw_detection(frame, box, label, confidence, color):
 
 def main():
     parser = argparse.ArgumentParser(description='Card detection with webcam or video file')
-    parser.add_argument('--model', type=str, default='runs/detect/train/weights/best.pt',
+    parser.add_argument('--model', type=str, default=None,
                         help='Path to trained model')
     parser.add_argument('--camera', type=int, default=0, help='Camera index')
     parser.add_argument('--video', type=str, help='Path to video file')
@@ -100,8 +54,7 @@ def main():
     args = parser.parse_args()
 
     # Load model
-    print(f"Loading model: {args.model}")
-    model = YOLO(args.model)
+    model = load_model(args.model)
 
     video_source = None
     is_video_file = False
@@ -109,18 +62,17 @@ def main():
     if args.latest:
         video_source = get_latest_recording()
         if video_source is None:
-            print(" no recordings found in recordings folder")
+            print("No recordings found in recordings folder")
             return
         is_video_file = True
-        print(f"using the most recent recording file : {video_source}")
+        print(f"Using the most recent recording file: {video_source}")
     elif args.video:
         video_source = args.video
         is_video_file = True
     else:
         video_source = args.camera
-        print(f"opening camera {args.camera}...")
+        print(f"Opening camera {args.camera}...")
 
-    # open the most recent saved video from the file path
     cap = cv2.VideoCapture(video_source)
 
     if not is_video_file:
@@ -128,13 +80,12 @@ def main():
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
 
     if not cap.isOpened():
-        print("camera could not be opend")
+        print("Camera could not be opened")
         return
 
-    
     all_detected_cards = set()
+    bounding_box_coords = []
 
-   
     fps_counter = 0
     fps_start_time = cv2.getTickCount()
     fps_display = 0
@@ -143,53 +94,34 @@ def main():
         ret, frame = cap.read()
         if not ret:
             if is_video_file:
-                print("vidoe complete")
+                print("Video complete")
             else:
-                print("could not read cam frames")
+                print("Could not read camera frames")
             break
 
-        
-        results = model(frame, conf=args.conf, iou=args.iou, verbose=False)
+        # Run detection using shared detector
+        detections = detect_cards_in_frame(model, frame, conf=args.conf, iou=args.iou)
 
-       
-        detected_cards = []
+        # Clear per-frame bounding box coords (keep last frame's)
+        bounding_box_coords = []
 
-        boxes = []
-       
-        for result in results:
-            boxes = result.boxes
-            if boxes is not None:
-                for box in boxes:
-                    
-                    xyxy = box.xyxy[0].cpu().numpy()
-                    x1, y1, x2, y2 = map(int, xyxy)
-                    center_x = (x1 + x2) / 2
-                    center_y = (y1 + y2) / 2
-                    conf = box.conf[0].cpu().numpy()
-                    cls = int(box.cls[0].cpu().numpy())
+        for det in detections:
+            all_detected_cards.add(det.card_value)
 
-                    # Get label
-                    label = model.names[cls]
-                    detected_cards.append((label, conf))
-                    all_detected_cards.add(format_card(label))
+            # Store bounding box coordinates
+            bounding_box_coords.append({
+                'label': det.label,
+                'x1': det.x1,
+                'y1': det.y1,
+                'x2': det.x2,
+                'y2': det.y2,
+                'center_x': det.center_x,
+                'center_y': det.center_y
+            })
 
-                    # get the pixel coords for the boxes --> gonna be used for distnaces
-                    boxes.append(
-                        {'x1': x1, 
-                         'y1': y1, 
-                         'x2': x2, 
-                         'y2': y2, 
-                         'center_x': center_x, 
-                         'center_y': center_y}
-                    )
+            frame = draw_detection(frame, det)
 
-                    # get the color of the suit
-                    color = get_color_for_card(label)
-
-                   
-                    frame = draw_detection(frame, xyxy, label, conf, color)
-
-      
+        # FPS calculation
         fps_counter += 1
         if fps_counter >= 30:
             fps_end_time = cv2.getTickCount()
@@ -197,34 +129,29 @@ def main():
             fps_start_time = fps_end_time
             fps_counter = 0
 
-        
-        info_text = f"FPS: {fps_display:.1f} | Cards: {len(detected_cards)}"
+        # Display info
+        info_text = f"FPS: {fps_display:.1f} | Cards: {len(detections)}"
         cv2.putText(frame, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-       
-        if detected_cards:
+        # Show detected cards list
+        if detections:
             y_offset = 60
             cv2.putText(frame, "Detected:", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            for card, _ in detected_cards[:10]:  # Show max 10
+            for det in detections[:10]:  # Show max 10
                 y_offset += 25
-                card_text = f"{CARD_NAMES.get(card, card)}"
-                color = get_color_for_card(card)
-                cv2.putText(frame, card_text, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(frame, det.display_name, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, det.color, 2)
 
-       
         cv2.imshow('Card Detection', frame)
 
-    
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
-    
     cards_list = sorted(list(all_detected_cards))
     print(f"Detected cards: {cards_list}")
-    return cards_list
+    return cards_list, bounding_box_coords
 
 
 if __name__ == '__main__':
