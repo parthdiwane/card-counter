@@ -89,8 +89,9 @@ class Detection:
 
 def load_model(model_path: str = None) -> YOLO:
     """Load YOLO model from path."""
+    import sys
     path = model_path or str(MODEL_PATH)
-    print(f"Loading model: {path}")
+    print(f"Loading model: {path}", file=sys.stderr)
     return YOLO(path)
 
 

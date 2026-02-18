@@ -19,9 +19,10 @@ Uses YOLOv8 for card recognition and expected value calculations to determine op
 This project combines computer vision with game theory to create a blackjack assistant that:
 
 - Detects playing cards in real-time using a custom-trained YOLOv8 model
-- Tracks cards seen throughout the game
+- Automatically determines dealer vs player cards based on screen position
 - Calculates expected value for hit/stand decisions
 - Recommends optimal plays based on remaining deck composition
+- Displays live detection visualization with bounding boxes, center points, and distance lines
 
 ## Demo
 
@@ -37,8 +38,12 @@ https://github.com/user-attachments/assets/055eb7a2-118c-4e09-86d8-228efabf4f95
 
 ```
 card-counter/
+├── run_counter.sh          # Main pipeline script
+├── requirements.txt        # Python dependencies
 ├── model/                  # Card detection
-│   ├── live_detect.py      # Run detection on camera or video
+│   ├── detector.py         # Shared detection module (YOLO wrapper, Detection class)
+│   ├── detect_and_decide.py # Automated detection with dealer/player sorting
+│   ├── live_detect.py      # Interactive detection with visualization
 │   ├── screen_record.py    # Record screen for later analysis
 │   ├── train.py            # Train the YOLO model
 │   ├── recordings/         # Saved screen recordings
@@ -54,7 +59,7 @@ card-counter/
 ### Prerequisites
 
 - Python 3.8+
-- C++ compiler (for algorithm)
+- C++ compiler (g++ with C++17 support)
 - Webcam or screen capture capability
 
 ### Installation
@@ -70,35 +75,58 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Compile the algorithm (optional - run_counter.sh does this automatically)
+cd algorithm && g++ -std=c++17 -O2 -o alg main.cpp
 ```
 
 ## Usage
 
-### Card Detection
+### Full Pipeline (Recommended)
+
+The easiest way to use the card counter is with the main pipeline script:
+
+```bash
+# Record screen, detect cards, get decision
+./run_counter.sh
+
+# Use a specific video file
+./run_counter.sh /path/to/video.mp4
+```
+
+This will:
+1. Record your screen (or use provided video)
+2. Open a live detection popup showing:
+   - Dark blue bounding boxes around detected cards
+   - Center points on each card
+   - Colored lines from origin to each card center (for distance visualization)
+   - Card labels with confidence percentages
+3. Automatically sort cards into dealer/player hands based on distance from origin
+4. Output HIT or STAND decision
+
+Press **Q** during the visualization to skip ahead.
+
+### Card Detection Only
 
 ```bash
 cd model
 
-# Live webcam detection
-python live_detect.py
+# Detect cards with live visualization
+python detect_and_decide.py --video /path/to/video.mp4
 
-# Process most recent screen recording
+# Detect without visualization (headless mode)
+python detect_and_decide.py --video /path/to/video.mp4 --no-display
+
+# Interactive detection (for debugging)
 python live_detect.py --latest
-
-# Process specific video file
-python live_detect.py --video recordings/your_video.mp4
-
-# Adjust confidence threshold
-python live_detect.py --latest --conf 0.7
+python live_detect.py --video /path/to/video.mp4
 ```
-
-**Output:** List of detected card values (e.g., `['4', '10', 'A', 'K']`)
 
 ### Screen Recording
 
 ```bash
 cd model
-python screen_record.py  # Records 7 seconds, saves to recordings/
+python screen_record.py  # Records 15 seconds, saves to recordings/
 ```
 
 ### Training Your Own Model
@@ -108,17 +136,20 @@ cd model
 python train.py --epochs 50 --batch 16 --device mps  # or 'cuda', 'cpu'
 ```
 
-## Model Performance
+## How It Works
 
-| Metric | Value |
-|--------|-------|
-| **mAP@0.5** | 0.83 |
-| **Classes** | 52 (full deck) |
-| **Cards** | 2-10, J, Q, K, A × 4 suits |
+### Card Detection & Position Tracking
 
-## How the Algorithm Works
+The detection pipeline uses distance from the screen origin (top-left corner) to determine which cards belong to the dealer vs player:
 
-The decision engine calculates expected value for hitting vs standing:
+1. **Detection**: YOLOv8 detects cards and returns bounding box coordinates
+2. **Center Calculation**: For each card, the center point is calculated
+3. **Distance Sorting**: Cards closer to the origin are assigned to the dealer; cards farther away are assigned to the player
+4. **Pairing**: Cards are paired (dealer card, player card) based on their relative distances
+
+### Decision Algorithm
+
+The C++ decision engine calculates expected value for hitting vs standing:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -134,6 +165,14 @@ The decision engine calculates expected value for hitting vs standing:
 bool shouldHit(const vector<int>& played, int num_decks = 1);
 ```
 
+## Model Performance
+
+| Metric | Value |
+|--------|-------|
+| **mAP@0.5** | 0.83 |
+| **Classes** | 52 (full deck) |
+| **Cards** | 2-10, J, Q, K, A × 4 suits |
+
 ## Tech Stack
 
 | Component | Technology |
@@ -147,11 +186,14 @@ bool shouldHit(const vector<int>& played, int num_decks = 1);
 ## Dependencies
 
 ```
-ultralytics
-opencv-python
-torch
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+torch>=2.0.0
+numpy>=1.24.0
 mss
 ```
+
+See `requirements.txt` for the full list.
 
 ---
 
@@ -161,8 +203,10 @@ mss
 
 **Developed By: Parth Diwane and Aarnav Koushik**
 
+
 </div>
 
 ---
-
-> **Disclaimer:** This README was generated using Claude and may contain inaccuracies. If you encounter any issues, please email: parthdiwane@ucsb.edu
+<div align="center">
+**This README file was created using claude, so it may contain inaccuracies. If you run into any issues please email use at: parthdiwane@ucsb.edu or akoushik@ucsb.edu**
+</div>
