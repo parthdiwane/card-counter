@@ -79,12 +79,12 @@ class Detection:
 
     @property
     def center_x(self) -> int:
-        return (self.x1 + self.x2) // 2
+        return (self.x1 + self.x2) / 2
 
     @property
     def center_y(self) -> int:
         """Get y-coordinate of bounding box center."""
-        return (self.y1 + self.y2) // 2
+        return (self.y1 + self.y2) / 2
 
 
 def load_model(model_path: str = None) -> YOLO:
