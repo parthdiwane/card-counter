@@ -203,4 +203,10 @@ See `requirements.txt` for the full list.
 
 **Developed By: Parth Diwane and Aarnav Koushik**
 
+
+</div>
+
+---
+<div align="center">
+**This README file was created using claude, so it may contain inaccuracies. If you run into any issues please email use at: parthdiwane@ucsb.edu or akoushik@ucsb.edu**
 </div>
