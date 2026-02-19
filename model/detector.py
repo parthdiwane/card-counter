@@ -95,7 +95,7 @@ def load_model(model_path: str = None) -> YOLO:
     return YOLO(path)
 
 
-def detect_cards_in_frame(model: YOLO, frame, conf: float = 0.5, iou: float = 0.45) -> list[Detection]:
+def detect_cards_in_frame(model: YOLO, frame, conf: float = 0.7, iou: float = 0.45) -> list[Detection]:
     results = model(frame, conf=conf, iou=iou, verbose=False)
     detections = []
 
