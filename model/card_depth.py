@@ -56,7 +56,8 @@ def get_depth():
     for frame in video_frames:
         depth_map = model.infer_pil(frame)
 
-        detected_cards = get_detected_cards()
+        model = load_model()
+        detected_cards = get_detected_cards(frame, model)
 
         for card in detected_cards:
             x1, x2, y1, y2 = card['x1'], card['x2'], card['y1'], card['y2']
