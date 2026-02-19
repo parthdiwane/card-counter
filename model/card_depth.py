@@ -51,14 +51,14 @@ def get_frames(video_path=None):
 def load_depth_model():
     # load MiDas
     # Use MiDaS small for faster inference
-    model = torch.hub.load("intel-isl/MiDaS", "MiDaS_small")
+    # verbose=False suppresses "Using cache" messages that break stdout parsing
+    model = torch.hub.load("intel-isl/MiDaS", "MiDaS_small", verbose=False)
     model.eval()
-
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
+    midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", verbose=False)
     transform = midas_transforms.small_transform
 
     return model, transform, device
