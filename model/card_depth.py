@@ -65,8 +65,28 @@ def get_depth():
             card_depth = depth_map[y1:y2, x1:x2].mean()
             net_card_depth.append({
                 'card': card['int_value'],
-                'depth': card_depth
+                'depth': card_depth,
+                'frame': frame
             })
 
     return net_card_depth
+
+
+def get_depth_per_card():
+    net_card_depth = get_depth()
+
+    card_depths = {}
+    for entry in net_card_depth:
+        value = entry['card']
+        if value not in card_depths:
+            card_depths[value] = []
+        card_depths[value].append(entry['depth'])
+
+    result = {}
+    for value, depths in card_depths.items():
+        result[value] = sum(depths) / len(depths)
+    
+    return result
+
+    
     
