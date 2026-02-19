@@ -1,10 +1,17 @@
 #!/bin/bash
 #
-# Card Counter - Records screen, detects cards, and outputs HIT/STAND decision
+# Card Counter Pipeline
+#
+# Flow:
+#   1. Record screen (or use provided video)
+#   2. Process video with card detection model (popup window)
+#   3. Process video with depth model for heat map (popup window)
+#   4. Use depth to classify dealer vs player cards (farther = dealer, closer = player)
+#   5. Send detected cards to decision algorithm
 #
 # Usage:
-#   ./run_counter.sh                  # Record screen, then detect cards
-#   ./run_counter.sh path/to/video.mp4  # Use specific video file (skip recording)
+#   ./run_counter.sh                     # Record screen, then detect cards
+#   ./run_counter.sh path/to/video.mp4   # Use specific video file (skip recording)
 #
 
 set -e
@@ -34,7 +41,9 @@ else
 fi
 
 echo ""
-echo "Step 2: Detecting cards..."
+echo "Step 2: Detecting cards with depth analysis..."
+echo "         (Two popup windows will appear: Card Detection & Depth Heat Map)"
+echo "         Press Q to skip processing early"
 CARDS=$(python3 "$MODEL_DIR/detect_and_decide.py" --video "$VIDEO_PATH")
 
 if [ -z "$CARDS" ]; then

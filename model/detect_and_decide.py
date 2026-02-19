@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 
 import sys
-import math
 import cv2
+import numpy as np
 
 from detector import (
     load_model,
     detect_cards_in_frame,
     get_latest_recording,
     MODEL_PATH,
+)
+
+from card_depth import (
+    load_depth_model,
+    process_frame_depth,
+    depth_to_heatmap,
+    get_card_depths_from_frame,
+    draw_depth_heatmap_with_cards,
+    get_detected_cards,
 )
 
 
@@ -30,86 +39,133 @@ def get_distinct_colors(n):
     return [colors[i % len(colors)] for i in range(n)]
 
 
-def detect_cards(video_path, model, conf=0.7, display=True):
+def draw_card_detection_frame(frame, detections, best_detections_count):
+    """Draw card detection visualization on a frame."""
+    display_frame = frame.copy()
+
+    # Generate distinct colors for each detection
+    colors = get_distinct_colors(len(detections))
+
+    # First pass: draw all lines from origin (so they appear behind everything)
+    for i, det in enumerate(detections):
+        card_color = colors[i]
+        center_x = int(det.center_x)
+        center_y = int(det.center_y)
+        cv2.line(display_frame, (0, 0), (center_x, center_y), card_color, 2)
+
+    # Second pass: draw bounding boxes, center points, and labels on top
+    DARK_BLUE = (139, 0, 0)  # Dark blue in BGR format
+
+    for i, det in enumerate(detections):
+        card_color = colors[i]
+        center_x = int(det.center_x)
+        center_y = int(det.center_y)
+
+        # Draw bounding box in dark blue
+        cv2.rectangle(display_frame, (det.x1, det.y1), (det.x2, det.y2), DARK_BLUE, 3)
+
+        # Draw center point (colored per card for the line)
+        cv2.circle(display_frame, (center_x, center_y), 8, card_color, -1)  # Filled circle
+        cv2.circle(display_frame, (center_x, center_y), 8, (0, 0, 0), 2)  # Black outline
+
+        # Draw label with confidence (with background for visibility)
+        label_text = f"{det.card_value} ({det.confidence:.0%})"
+        (text_w, text_h), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        cv2.rectangle(display_frame, (det.x1, det.y1 - text_h - 10), (det.x1 + text_w + 5, det.y1), DARK_BLUE, -1)
+        cv2.putText(display_frame, label_text, (det.x1 + 2, det.y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        # Draw center coordinates
+        coord_text = f"({center_x}, {center_y})"
+        cv2.putText(display_frame, coord_text, (center_x - 40, center_y + 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+    # Draw origin marker
+    cv2.circle(display_frame, (0, 0), 10, (255, 255, 255), -1)
+    cv2.putText(display_frame, "Origin", (5, 25),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+    # Show count of unique cards detected so far
+    info_text = f"Unique cards detected: {best_detections_count}"
+    cv2.putText(display_frame, info_text, (10, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+    return display_frame
+
+
+def detect_cards_with_depth(video_path, card_model, depth_model, depth_transform, device=None, conf=0.7, display=True, depth_skip=3):
     """
-    Detect cards and return them sorted by x-position (left to right).
-    Shows live detection popup if display=True.
-    Returns list of dicts with card info and bounding box coordinates.
+    Detect cards with depth information.
+    Shows combined view: card detection and depth heat map side by side.
+    Returns list of dicts with card info, bounding box, and depth.
+
+    depth_skip: Only compute depth every N frames for performance (default: 3)
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return []
 
-    # Track best detection per card label
+    # Track best detection per card label (with depth info)
     best_detections = {}
+
+    frame_count = 0
+    cached_depth_map = None
+    cached_heatmap = None
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Run detection using shared detector
-        detections = detect_cards_in_frame(model, frame, conf=conf)
+        frame_count += 1
 
-        for det in detections:
-            # Keep the highest confidence detection for each card label
-            if det.label not in best_detections or det.confidence > best_detections[det.label].confidence:
-                best_detections[det.label] = det
+        # Run card detection (every frame)
+        detections = detect_cards_in_frame(card_model, frame, conf=conf)
 
-        # Draw detections on frame for display
+        # Get depth map (only every N frames for performance)
+        if cached_depth_map is None or frame_count % depth_skip == 0:
+            depth_map = process_frame_depth(depth_model, depth_transform, frame, device)
+            cached_depth_map = depth_map
+            cached_heatmap = depth_to_heatmap(depth_map)
+        else:
+            depth_map = cached_depth_map
+
+        # Get detected cards as dicts for depth processing
+        detected_cards_dicts = get_detected_cards(frame, card_model)
+
+        # Get depth for each card
+        card_depths = get_card_depths_from_frame(depth_map, detected_cards_dicts)
+
+        # Update best detections - keep highest confidence for each label
+        for card_info in card_depths:
+            label = card_info['label']
+            if label not in best_detections:
+                best_detections[label] = card_info
+
         if display:
-            display_frame = frame.copy()
+            # Card Detection view
+            detection_display = draw_card_detection_frame(frame, detections, len(best_detections))
 
-            # Generate distinct colors for each detection
-            colors = get_distinct_colors(len(detections))
+            # Depth Heat Map view (use cached heatmap for performance)
+            heatmap_display = draw_depth_heatmap_with_cards(cached_heatmap.copy(), card_depths)
 
-            # First pass: draw all lines from origin (so they appear behind everything)
-            for i, det in enumerate(detections):
-                card_color = colors[i]
-                center_x = int(det.center_x)
-                center_y = int(det.center_y)
-                cv2.line(display_frame, (0, 0), (center_x, center_y), card_color, 2)
+            # Resize both to same height for side-by-side display
+            h1, w1 = detection_display.shape[:2]
+            h2, w2 = heatmap_display.shape[:2]
+            target_height = min(h1, h2, 720)  # Cap at 720p for performance
 
-            # Second pass: draw bounding boxes, center points, and labels on top
-            DARK_BLUE = (139, 0, 0)  # Dark blue in BGR format
+            scale1 = target_height / h1
+            scale2 = target_height / h2
 
-            for i, det in enumerate(detections):
-                card_color = colors[i]
-                center_x = int(det.center_x)
-                center_y = int(det.center_y)
+            detection_resized = cv2.resize(detection_display, (int(w1 * scale1), target_height))
+            heatmap_resized = cv2.resize(heatmap_display, (int(w2 * scale2), target_height))
 
-                # Draw bounding box in dark blue
-                cv2.rectangle(display_frame, (det.x1, det.y1), (det.x2, det.y2), DARK_BLUE, 3)
+            # Combine side by side
+            combined = np.hstack([detection_resized, heatmap_resized])
 
-                # Draw center point (colored per card for the line)
-                cv2.circle(display_frame, (center_x, center_y), 8, card_color, -1)  # Filled circle
-                cv2.circle(display_frame, (center_x, center_y), 8, (0, 0, 0), 2)  # Black outline
+            cv2.imshow('Card Detection + Depth - Press Q to skip', combined)
 
-                # Draw label with confidence (with background for visibility)
-                label_text = f"{det.card_value} ({det.confidence:.0%})"
-                (text_w, text_h), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-                cv2.rectangle(display_frame, (det.x1, det.y1 - text_h - 10), (det.x1 + text_w + 5, det.y1), DARK_BLUE, -1)
-                cv2.putText(display_frame, label_text, (det.x1 + 2, det.y1 - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-                # Draw center coordinates
-                coord_text = f"({center_x}, {center_y})"
-                cv2.putText(display_frame, coord_text, (center_x - 40, center_y + 25),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-
-            # Draw origin marker
-            cv2.circle(display_frame, (0, 0), 10, (255, 255, 255), -1)
-            cv2.putText(display_frame, "Origin", (5, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-            # Show count of unique cards detected so far
-            info_text = f"Unique cards detected: {len(best_detections)}"
-            cv2.putText(display_frame, info_text, (10, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-            cv2.imshow('Card Detection - Press Q to skip', display_frame)
-
-            # Allow early exit with 'q' key, but don't block
+            # Check for quit
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -118,28 +174,18 @@ def detect_cards(video_path, model, conf=0.7, display=True):
         cv2.destroyAllWindows()
 
     # Sort by x position (left to right)
-    sorted_cards = sorted(best_detections.values(), key=lambda d: d.center_x)
+    sorted_cards = sorted(best_detections.values(), key=lambda d: d['center_x'])
 
-    # Return list of dicts with all info
-    return [
-        {
-            'card_str': det.card_value,
-            'int_value': det.int_value,
-            'x1': det.x1,
-            'y1': det.y1,
-            'x2': det.x2,
-            'y2': det.y2,
-            'center_x': det.center_x,
-            'center_y': det.center_y,
-        }
-        for det in sorted_cards
-    ]
+    return sorted_cards
 
 
-def build_played_list(cards):
+def build_played_list_by_depth(cards):
     """
-    Build played list from detected cards.
-    cards: list of dicts with 'card_str', 'int_value', 'center_x', 'center_y', etc.
+    Build played list from detected cards using DEPTH for dealer/player classification.
+    Further cards (higher depth) = dealer cards
+    Closer cards (lower depth) = player cards
+
+    cards: list of dicts with 'card_str', 'int_value', 'depth', 'center_x', etc.
     """
     if len(cards) < 2:
         return [], [], []
@@ -147,38 +193,32 @@ def build_played_list(cards):
     player_cards, dealer_cards = [], []
     num_cards = len(cards)
 
-
+    # Process cards in pairs (sorted left to right)
     for index in range(0, num_cards, 2):
+        if index + 1 >= num_cards:
+            break  # Odd number of cards, no pair for this card
 
-        if(index + 1 >= num_cards):
-            break # odd number of cards thus no pair for this card
+        card1 = cards[index]
+        card2 = cards[index + 1]
 
-        card1_coords = [cards[index]['center_x'], cards[index]['center_y']]
-        card2_coords = [cards[index + 1]['center_x'], cards[index + 1]['center_y']]
+        # Use depth to classify: higher depth = farther = dealer
+        depth1 = card1['depth']
+        depth2 = card2['depth']
 
-
-
-        card1_x_sqaured, card1_y_sqaured = pow(card1_coords[0], 2), pow(card1_coords[1], 2)
-        card2_x_sqaured, card2_y_sqaured = pow(card2_coords[0], 2), pow(card2_coords[1], 2)
-
-
-        # getting the distance from the origin to the center of the card --> card with closer distance is the dealer card
-        dist_card1 = math.sqrt(card1_x_sqaured + card1_y_sqaured)
-        dist_card2 = math.sqrt(card2_x_sqaured + card2_y_sqaured)
-
-
-        if(dist_card1 < dist_card2): # first card is the dealer card --> close to the dealer
-            dealer_cards.append(cards[index]['int_value'])
-            player_cards.append(cards[index + 1]['int_value'])
+        if depth1 > depth2:
+            # Card 1 is farther (dealer), Card 2 is closer (player)
+            dealer_cards.append(card1['card'])
+            player_cards.append(card2['card'])
         else:
-            dealer_cards.append(cards[index + 1]['int_value'])
-            player_cards.append(cards[index]['int_value'])
+            # Card 2 is farther (dealer), Card 1 is closer (player)
+            dealer_cards.append(card2['card'])
+            player_cards.append(card1['card'])
 
-
-    # pad w/ zeros if the number of cards in the dist is diff
+    # Pad with zeros if needed
     while len(dealer_cards) < len(player_cards):
         dealer_cards.append(0)
 
+    # Interleave: dealer_1, player_1, dealer_2, player_2, ...
     played = []
     for i in range(len(player_cards)):
         played.append(dealer_cards[i])
@@ -204,16 +244,29 @@ def main():
 
     print(f"Processing: {video_path}", file=sys.stderr)
 
-    model = load_model(str(MODEL_PATH))
-    cards = detect_cards(video_path, model, display=not args.no_display)
+    # Load both models
+    print("Loading card detection model...", file=sys.stderr)
+    card_model = load_model(str(MODEL_PATH))
+
+    print("Loading depth estimation model...", file=sys.stderr)
+    depth_model, depth_transform, device = load_depth_model()
+
+    # Detect cards with depth
+    cards = detect_cards_with_depth(
+        video_path, card_model, depth_model, depth_transform, device,
+        display=not args.no_display
+    )
 
     if not cards:
         print("ERROR: No cards detected", file=sys.stderr)
         sys.exit(1)
 
     print(f"Detected cards (left to right): {[c['card_str'] for c in cards]}", file=sys.stderr)
+    depth_info = [(c['card_str'], f"{c['depth']:.3f}") for c in cards]
+    print(f"Card depths: {depth_info}", file=sys.stderr)
 
-    played, player_cards, dealer_cards = build_played_list(cards)
+    # Build played list using depth-based classification
+    played, player_cards, dealer_cards = build_played_list_by_depth(cards)
 
     if not played:
         print("ERROR: Need at least 2 cards", file=sys.stderr)
@@ -222,9 +275,10 @@ def main():
     player_total = sum(player_cards)
     dealer_total = sum(dealer_cards)
 
-    print(f"Player hand: {player_cards} (total: {player_total})", file=sys.stderr)
-    print(f"Dealer hand: {dealer_cards} (total: {dealer_total})", file=sys.stderr)
+    print(f"Player hand (closer/lower depth): {player_cards} (total: {player_total})", file=sys.stderr)
+    print(f"Dealer hand (farther/higher depth): {dealer_cards} (total: {dealer_total})", file=sys.stderr)
 
+    # Output for algorithm
     print(",".join(map(str, played)))
 
 
