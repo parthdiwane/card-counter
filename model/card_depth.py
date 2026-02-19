@@ -53,7 +53,6 @@ def load_depth_model():
     # Use MiDaS small for faster inference
     # Redirect stdout to stderr during loading to prevent breaking shell parsing
     import sys
-    import os
 
     # Suppress stdout during model loading (nested deps print to stdout)
     old_stdout = sys.stdout

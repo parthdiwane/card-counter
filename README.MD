@@ -6,9 +6,10 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![YOLOv8](https://img.shields.io/badge/YOLOv8-Computer%20Vision-00FFFF?style=for-the-badge)](https://github.com/ultralytics/ultralytics)
+[![MiDaS](https://img.shields.io/badge/MiDaS-Depth%20Estimation-FF6B6B?style=for-the-badge)](https://github.com/isl-org/MiDaS)
 [![C++](https://img.shields.io/badge/C++-Algorithm-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)](https://isocpp.org)
 
-Uses YOLOv8 for card recognition and expected value calculations to determine optimal play.
+Uses YOLOv8 for card recognition, MiDaS for depth estimation, and expected value calculations to determine optimal play.
 
 </div>
 
@@ -19,10 +20,10 @@ Uses YOLOv8 for card recognition and expected value calculations to determine op
 This project combines computer vision with game theory to create a blackjack assistant that:
 
 - Detects playing cards in real-time using a custom-trained YOLOv8 model
-- Automatically determines dealer vs player cards based on screen position
+- Uses **depth estimation** to distinguish dealer vs player cards (farther cards = dealer, closer cards = player)
+- Displays a combined visualization with card detection and depth heat map side-by-side
 - Calculates expected value for hit/stand decisions
 - Recommends optimal plays based on remaining deck composition
-- Displays live detection visualization with bounding boxes, center points, and distance lines
 
 ## Demo
 
@@ -40,9 +41,10 @@ https://github.com/user-attachments/assets/055eb7a2-118c-4e09-86d8-228efabf4f95
 card-counter/
 ├── run_counter.sh          # Main pipeline script
 ├── requirements.txt        # Python dependencies
-├── model/                  # Card detection
+├── model/                  # Card detection & depth estimation
 │   ├── detector.py         # Shared detection module (YOLO wrapper, Detection class)
-│   ├── detect_and_decide.py # Automated detection with dealer/player sorting
+│   ├── detect_and_decide.py # Detection + depth analysis with visualization
+│   ├── card_depth.py       # MiDaS depth estimation for dealer/player classification
 │   ├── live_detect.py      # Interactive detection with visualization
 │   ├── screen_record.py    # Record screen for later analysis
 │   ├── train.py            # Train the YOLO model
@@ -94,15 +96,22 @@ The easiest way to use the card counter is with the main pipeline script:
 ./run_counter.sh /path/to/video.mp4
 ```
 
-This will:
-1. Record your screen (or use provided video)
-2. Open a live detection popup showing:
-   - Dark blue bounding boxes around detected cards
-   - Center points on each card
-   - Colored lines from origin to each card center (for distance visualization)
-   - Card labels with confidence percentages
-3. Automatically sort cards into dealer/player hands based on distance from origin
-4. Output HIT or STAND decision
+**Pipeline Flow:**
+```
+./run_counter.sh
+     │
+     ├─► Step 1: Record screen (or use provided video)
+     │
+     ├─► Step 2: Process video with combined visualization:
+     │       • Left side: Card detection (bounding boxes, labels, confidence)
+     │       • Right side: Depth heat map (visual depth estimation)
+     │
+     ├─► Step 3: Classify cards by DEPTH:
+     │       • Closer cards (lower depth) = Player cards
+     │       • Farther cards (higher depth) = Dealer cards
+     │
+     └─► Step 4: Run decision algorithm → HIT/STAND
+```
 
 Press **Q** during the visualization to skip ahead.
 
@@ -138,14 +147,16 @@ python train.py --epochs 50 --batch 16 --device mps  # or 'cuda', 'cpu'
 
 ## How It Works
 
-### Card Detection & Position Tracking
+### Card Detection & Depth-Based Classification
 
-The detection pipeline uses distance from the screen origin (top-left corner) to determine which cards belong to the dealer vs player:
+The detection pipeline uses **monocular depth estimation** to determine which cards belong to the dealer vs player:
 
-1. **Detection**: YOLOv8 detects cards and returns bounding box coordinates
-2. **Center Calculation**: For each card, the center point is calculated
-3. **Distance Sorting**: Cards closer to the origin are assigned to the dealer; cards farther away are assigned to the player
-4. **Pairing**: Cards are paired (dealer card, player card) based on their relative distances
+1. **Card Detection**: YOLOv8 detects cards and returns bounding box coordinates
+2. **Depth Estimation**: MiDaS generates a depth map from the 2D frame
+3. **Depth Extraction**: For each detected card, the mean depth within its bounding box is calculated
+4. **Classification**: Cards are paired left-to-right; within each pair:
+   - The card with **higher depth** (farther from camera) → Dealer
+   - The card with **lower depth** (closer to camera) → Player
 
 ### Decision Algorithm
 
@@ -178,6 +189,7 @@ bool shouldHit(const vector<int>& played, int num_decks = 1);
 | Component | Technology |
 |-----------|------------|
 | Card Detection | YOLOv8 (Ultralytics) |
+| Depth Estimation | MiDaS (Intel ISL) |
 | Video Processing | OpenCV |
 | Deep Learning | PyTorch |
 | Screen Capture | MSS |
@@ -190,6 +202,7 @@ ultralytics>=8.0.0
 opencv-python>=4.8.0
 torch>=2.0.0
 numpy>=1.24.0
+timm
 mss
 ```
 
